@@ -25,37 +25,45 @@ Item {
         onTextChanged: tab.filterText = text
     }
 
-    DankFlickable {
+    StyledRect {
+        id: listCard
         anchors.top: searchField.bottom
         anchors.topMargin: Theme.spacingM
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: hintText.top
-        anchors.bottomMargin: Theme.spacingS
-        clip: true
-        contentHeight: deviceCol.height
+        anchors.bottomMargin: Theme.spacingM
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
 
-        Column {
-            id: deviceCol
-            width: parent.width
-            spacing: Theme.spacingXS
+        DankFlickable {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            clip: true
+            contentHeight: deviceCol.height
 
-            Repeater {
-                model: tab.visibleDevices
+            Column {
+                id: deviceCol
+                width: parent.width
+                spacing: Theme.spacingXS
 
-                DeviceRow {
-                    required property var modelData
-                    width: parent.width
-                    device: modelData
-                    showDetails: true
-                    onActivated: TailscaleService.copyDevice(modelData)
+                Repeater {
+                    model: tab.visibleDevices
+
+                    DeviceRow {
+                        required property var modelData
+                        width: parent.width
+                        device: modelData
+                        showDetails: true
+                        onActivated: TailscaleService.copyDevice(modelData)
+                    }
                 }
-            }
 
-            StyledText {
-                visible: tab.visibleDevices.length === 0
-                text: TailscaleService.statusReady ? "No devices found" : "Loading…"
-                color: Theme.surfaceVariantText
+                StyledText {
+                    visible: tab.visibleDevices.length === 0
+                    text: TailscaleService.statusReady ? "No devices found" : "Loading…"
+                    color: Theme.surfaceVariantText
+                }
             }
         }
     }

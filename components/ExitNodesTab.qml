@@ -75,76 +75,90 @@ Item {
         wrapMode: Text.WordWrap
     }
 
-    DankFlickable {
+    StyledRect {
+        id: optionsCard
         anchors.top: introText.bottom
         anchors.topMargin: Theme.spacingM
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: togglesCol.top
+        anchors.bottom: togglesCard.top
         anchors.bottomMargin: Theme.spacingM
-        clip: true
-        contentHeight: optCol.height
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
 
-        Column {
-            id: optCol
-            width: parent.width
-            spacing: Theme.spacingXS
+        DankFlickable {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            clip: true
+            contentHeight: optCol.height
 
-            ExitOption {
-                title: "None"
-                subtitle: "Route traffic directly (no exit node)"
-                selected: !TailscaleService.activeExitNode && TailscaleService.prefExitNodeId === "" && TailscaleService.prefExitNodeIp === ""
-                onActivated: TailscaleService.setExitNode("", "")
-            }
-
-            Repeater {
-                model: TailscaleService.exitNodeCandidates
+            Column {
+                id: optCol
+                width: parent.width
+                spacing: Theme.spacingXS
 
                 ExitOption {
-                    required property var modelData
-                    title: modelData.name
-                    subtitle: modelData.ip + (modelData.online ? "" : " • offline")
-                    dimmed: !modelData.online
-                    selected: modelData.exitNode || TailscaleService.prefExitNodeId === modelData.id || (TailscaleService.prefExitNodeIp !== "" && TailscaleService.prefExitNodeIp === modelData.ip)
-                    onActivated: TailscaleService.setExitNode(modelData.ip, modelData.name)
+                    title: "None"
+                    subtitle: "Route traffic directly (no exit node)"
+                    selected: !TailscaleService.activeExitNode && TailscaleService.prefExitNodeId === "" && TailscaleService.prefExitNodeIp === ""
+                    onActivated: TailscaleService.setExitNode("", "")
                 }
-            }
 
-            StyledText {
-                visible: TailscaleService.exitNodeCandidates.length === 0
-                text: "No devices on your tailnet offer an exit node"
-                color: Theme.surfaceVariantText
+                Repeater {
+                    model: TailscaleService.exitNodeCandidates
+
+                    ExitOption {
+                        required property var modelData
+                        title: modelData.name
+                        subtitle: modelData.ip + (modelData.online ? "" : " • offline")
+                        dimmed: !modelData.online
+                        selected: modelData.exitNode || TailscaleService.prefExitNodeId === modelData.id || (TailscaleService.prefExitNodeIp !== "" && TailscaleService.prefExitNodeIp === modelData.ip)
+                        onActivated: TailscaleService.setExitNode(modelData.ip, modelData.name)
+                    }
+                }
+
+                StyledText {
+                    visible: TailscaleService.exitNodeCandidates.length === 0
+                    text: "No devices on your tailnet offer an exit node"
+                    color: Theme.surfaceVariantText
+                }
             }
         }
     }
 
-    Column {
-        id: togglesCol
+    StyledRect {
+        id: togglesCard
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: Theme.spacingXS
+        height: togglesCol.height + Theme.spacingS * 2
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.outlineMedium
-        }
+        Column {
+            id: togglesCol
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: Theme.spacingS
+            anchors.rightMargin: Theme.spacingS
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Theme.spacingXS
 
-        DankToggle {
-            width: parent.width
-            text: "Allow local network access"
-            description: "Keep direct access to your LAN while using an exit node"
-            checked: TailscaleService.exitNodeAllowLan
-            onToggled: checked => TailscaleService.setExitNodeAllowLan(checked)
-        }
+            DankToggle {
+                width: parent.width
+                text: "Allow local network access"
+                description: "Keep direct access to your LAN while using an exit node"
+                checked: TailscaleService.exitNodeAllowLan
+                onToggled: checked => TailscaleService.setExitNodeAllowLan(checked)
+            }
 
-        DankToggle {
-            width: parent.width
-            text: "Run this device as an exit node"
-            description: "Let other tailnet devices route their internet traffic through this machine"
-            checked: TailscaleService.advertisesExitNode
-            onToggled: checked => TailscaleService.setAdvertiseExitNode(checked)
+            DankToggle {
+                width: parent.width
+                text: "Run this device as an exit node"
+                description: "Let other tailnet devices route their internet traffic through this machine"
+                checked: TailscaleService.advertisesExitNode
+                onToggled: checked => TailscaleService.setAdvertiseExitNode(checked)
+            }
         }
     }
 }

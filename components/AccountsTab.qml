@@ -5,19 +5,25 @@ import qs.Widgets
 Item {
     id: tab
 
-    DankFlickable {
+    StyledRect {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: bottomCol.top
         anchors.bottomMargin: Theme.spacingM
-        clip: true
-        contentHeight: accountsCol.height
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
 
-        Column {
-            id: accountsCol
-            width: parent.width
-            spacing: Theme.spacingXS
+        DankFlickable {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            clip: true
+            contentHeight: accountsCol.height
+
+            Column {
+                id: accountsCol
+                width: parent.width
+                spacing: Theme.spacingXS
 
             Repeater {
                 model: TailscaleService.accounts
@@ -89,10 +95,11 @@ Item {
                 }
             }
 
-            StyledText {
-                visible: TailscaleService.accounts.length === 0
-                text: "No Tailscale accounts on this device yet"
-                color: Theme.surfaceVariantText
+                StyledText {
+                    visible: TailscaleService.accounts.length === 0
+                    text: "No Tailscale accounts on this device yet"
+                    color: Theme.surfaceVariantText
+                }
             }
         }
     }

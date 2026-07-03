@@ -12,65 +12,82 @@ Item {
         anchors.right: parent.right
         spacing: Theme.spacingM
 
-        DankToggle {
+        StyledRect {
             width: parent.width
-            text: "Accept subnet routes"
-            description: "Use routes advertised by other devices on the tailnet"
-            checked: TailscaleService.acceptRoutes
-            onToggled: checked => TailscaleService.setAcceptRoutes(checked)
+            height: acceptToggle.height + Theme.spacingS * 2
+            radius: Theme.cornerRadius
+            color: Theme.surfaceContainerHigh
+
+            DankToggle {
+                id: acceptToggle
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: Theme.spacingS
+                anchors.rightMargin: Theme.spacingS
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Accept subnet routes"
+                description: "Use routes advertised by other devices on the tailnet"
+                checked: TailscaleService.acceptRoutes
+                onToggled: checked => TailscaleService.setAcceptRoutes(checked)
+            }
         }
 
-        Rectangle {
+        StyledRect {
             width: parent.width
-            height: 1
-            color: Theme.outlineMedium
-        }
+            height: advertiseCol.height + Theme.spacingM * 2
+            radius: Theme.cornerRadius
+            color: Theme.surfaceContainerHigh
 
-        StyledText {
-            text: "Advertise routes from this device"
-            font.weight: Font.Medium
-        }
+            Column {
+                id: advertiseCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: Theme.spacingM
+                anchors.rightMargin: Theme.spacingM
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.spacingS
 
-        StyledText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: "Comma-separated CIDR ranges this device can reach, e.g. 192.168.1.0/24. Routes must be approved in the Tailscale admin console before other devices can use them."
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.surfaceVariantText
-        }
+                StyledText {
+                    text: "Advertise routes from this device"
+                    font.weight: Font.Medium
+                }
 
-        Row {
-            width: parent.width
-            spacing: Theme.spacingS
+                StyledText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "Comma-separated CIDR ranges this device can reach, e.g. 192.168.1.0/24. Routes must be approved in the Tailscale admin console before other devices can use them."
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                }
 
-            DankTextField {
-                id: routesField
-                width: parent.width - applyButton.width - Theme.spacingS
-                placeholderText: "192.168.1.0/24, 10.0.0.0/8"
+                Row {
+                    width: parent.width
+                    spacing: Theme.spacingS
 
-                Component.onCompleted: text = TailscaleService.advertisedRoutes.join(", ")
+                    DankTextField {
+                        id: routesField
+                        width: parent.width - applyButton.width - Theme.spacingS
+                        placeholderText: "192.168.1.0/24, 10.0.0.0/8"
 
-                Connections {
-                    target: TailscaleService
-                    function onAdvertisedRoutesChanged() {
-                        if (!routesField.activeFocus)
-                            routesField.text = TailscaleService.advertisedRoutes.join(", ");
+                        Component.onCompleted: text = TailscaleService.advertisedRoutes.join(", ")
+
+                        Connections {
+                            target: TailscaleService
+                            function onAdvertisedRoutesChanged() {
+                                if (!routesField.activeFocus)
+                                    routesField.text = TailscaleService.advertisedRoutes.join(", ");
+                            }
+                        }
+                    }
+
+                    DankButton {
+                        id: applyButton
+                        anchors.verticalCenter: routesField.verticalCenter
+                        text: "Apply"
+                        onClicked: TailscaleService.setAdvertisedRoutes(routesField.text)
                     }
                 }
             }
-
-            DankButton {
-                id: applyButton
-                anchors.verticalCenter: routesField.verticalCenter
-                text: "Apply"
-                onClicked: TailscaleService.setAdvertisedRoutes(routesField.text)
-            }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.outlineMedium
         }
 
         StyledText {
@@ -79,36 +96,43 @@ Item {
         }
     }
 
-    DankFlickable {
+    StyledRect {
         anchors.top: topCol.bottom
-        anchors.topMargin: Theme.spacingM
+        anchors.topMargin: Theme.spacingS
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        clip: true
-        contentHeight: routerCol.height
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
 
-        Column {
-            id: routerCol
-            width: parent.width
-            spacing: Theme.spacingXS
+        DankFlickable {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            clip: true
+            contentHeight: routerCol.height
 
-            Repeater {
-                model: TailscaleService.subnetRouters
+            Column {
+                id: routerCol
+                width: parent.width
+                spacing: Theme.spacingXS
 
-                DeviceRow {
-                    required property var modelData
-                    width: parent.width
-                    device: modelData
-                    showDetails: true
-                    onActivated: TailscaleService.copyDevice(modelData)
+                Repeater {
+                    model: TailscaleService.subnetRouters
+
+                    DeviceRow {
+                        required property var modelData
+                        width: parent.width
+                        device: modelData
+                        showDetails: true
+                        onActivated: TailscaleService.copyDevice(modelData)
+                    }
                 }
-            }
 
-            StyledText {
-                visible: TailscaleService.subnetRouters.length === 0
-                text: "No devices are advertising subnet routes"
-                color: Theme.surfaceVariantText
+                StyledText {
+                    visible: TailscaleService.subnetRouters.length === 0
+                    text: "No devices are advertising subnet routes"
+                    color: Theme.surfaceVariantText
+                }
             }
         }
     }
