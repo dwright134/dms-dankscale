@@ -9,6 +9,8 @@ DankModal {
     property int currentTab: 0
 
     readonly property string statusLine: {
+        if (TailscaleService.operatorMissing)
+            return "Operator access required";
         if (TailscaleService.health.length > 0)
             return TailscaleService.health[0];
         if (!TailscaleService.isRunning) {
@@ -83,6 +85,7 @@ DankModal {
                     spacing: Theme.spacingM
 
                     DankToggle {
+                        visible: !TailscaleService.operatorMissing
                         anchors.verticalCenter: parent.verticalCenter
                         hideText: true
                         checked: TailscaleService.isRunning
@@ -102,6 +105,7 @@ DankModal {
 
             DankTabBar {
                 id: tabBar
+                visible: !TailscaleService.operatorMissing
                 anchors.top: header.bottom
                 anchors.topMargin: Theme.spacingM
                 anchors.left: parent.left
@@ -118,7 +122,25 @@ DankModal {
                 ]
             }
 
+            // Everything below the header is replaced by the operator warning
+            // while the user can't control the daemon — the tabs would only
+            // show details and actions that are guaranteed to fail.
+            Item {
+                visible: TailscaleService.operatorMissing
+                anchors.top: header.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+
+                OperatorWarning {
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - Theme.spacingL * 2, 440)
+                }
+            }
+
             Loader {
+                active: !TailscaleService.operatorMissing
+                visible: active
                 anchors.top: tabBar.bottom
                 anchors.topMargin: Theme.spacingM
                 anchors.left: parent.left

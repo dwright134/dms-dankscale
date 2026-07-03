@@ -2,3 +2,4 @@ singleton TailscaleService 1.0 ../services/TailscaleService.qml
 TailscaleLogo 1.0 TailscaleLogo.qml
 ExitNodeMenu 1.0 ExitNodeMenu.qml
 AccountMenu 1.0 AccountMenu.qml
+OperatorWarning 1.0 OperatorWarning.qml

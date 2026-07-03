@@ -16,6 +16,21 @@ Singleton {
     readonly property bool daemonDown: backendState === "NoDaemon"
     property bool statusReady: false
 
+    // True when the current user lacks operator rights on the Tailscale
+    // daemon — status (read-only) still works, but up/down/set would be
+    // rejected with "Access denied: prefs write access denied". Surfaced as a
+    // warning so the user knows to run `sudo tailscale set --operator=$USER`.
+    property bool operatorMissing: false
+
+    // Login name of the user running the shell; compared against the
+    // daemon's OperatorUser to detect missing operator rights.
+    readonly property string currentUser: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
+    // Shown and copied literally — $USER expands in the user's own terminal.
+    readonly property string operatorFixCommand: "sudo tailscale set --operator=$USER"
+
+    // Suppresses repeated operator-warning toasts while the condition persists.
+    property bool _operatorWarned: false
+
     readonly property string stateLabel: {
         switch (backendState) {
         case "Running":
@@ -320,6 +335,27 @@ Singleton {
         const adv = p.AdvertiseRoutes || [];
         advertisesExitNode = adv.indexOf("0.0.0.0/0") !== -1 || adv.indexOf("::/0") !== -1;
         advertisedRoutes = adv.filter(r => r !== "0.0.0.0/0" && r !== "::/0");
+        // Operator rights are per-user: OperatorUser must match *this* user
+        // (granted via `sudo tailscale set --operator=$USER`), otherwise
+        // mutating commands (up/down/set) are rejected even though status
+        // still works. Root always has access. If we can't determine the
+        // current user, fall back to just checking that an operator is set.
+        if (currentUser === "root")
+            setOperatorMissing(false);
+        else
+            setOperatorMissing(currentUser ? p.OperatorUser !== currentUser : !p.OperatorUser);
+    }
+
+    function setOperatorMissing(missing) {
+        if (operatorMissing === missing)
+            return;
+        operatorMissing = missing;
+        if (missing && !_operatorWarned) {
+            _operatorWarned = true;
+            ToastService.showWarning("Tailscale CLI can't make changes for your user. Run: " + operatorFixCommand);
+        } else if (!missing) {
+            _operatorWarned = false;
+        }
     }
 
     function _handleLoginLine(line) {
@@ -393,6 +429,11 @@ Singleton {
                     ToastService.showInfo(actionProc.successMessage);
             } else {
                 const msg = (actionErr.text || actionOut.text || "").trim();
+                // Mutating commands fail with "Access denied: prefs write
+                // access denied" when no operator is set — flag it so the
+                // warning banner appears alongside the error toast.
+                if (/access denied|operator/.test(msg.toLowerCase()))
+                    root.setOperatorMissing(true);
                 ToastService.showError("Tailscale", msg.split("\n")[0] || ("exit code " + exitCode));
             }
             root.refresh();
