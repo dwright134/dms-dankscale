@@ -15,6 +15,8 @@ PluginComponent {
     readonly property bool showOffline: pluginData.showOffline === undefined ? true : pluginData.showOffline === true
 
     readonly property string statusText: {
+        if (TailscaleService.operatorMissing)
+            return "Operator access required";
         if (TailscaleService.needsLogin)
             return "Login required";
         if (TailscaleService.daemonDown)
@@ -93,6 +95,13 @@ PluginComponent {
         function status(): string {
             return TailscaleService.stateLabel + " • " + TailscaleService.onlineCount + "/" + TailscaleService.deviceCount + " online";
         }
+
+        function operator(): string {
+            return JSON.stringify({
+                operatorMissing: TailscaleService.operatorMissing,
+                detectedUser: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
+            });
+        }
     }
 
     horizontalBarPill: Component {
@@ -105,7 +114,7 @@ PluginComponent {
                 id: barIcon
                 anchors.centerIn: parent
                 size: root.iconSizeLarge - 4
-                connected: TailscaleService.isRunning
+                connected: TailscaleService.isRunning && !TailscaleService.operatorMissing
                 dotColor: Theme.widgetIconColor
             }
 
@@ -122,7 +131,7 @@ PluginComponent {
             }
 
             DankIcon {
-                visible: TailscaleService.needsLogin || TailscaleService.daemonDown
+                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing
                 name: "priority_high"
                 filled: true
                 size: barIcon.size * 0.55
@@ -145,7 +154,7 @@ PluginComponent {
                 id: barIconV
                 anchors.centerIn: parent
                 size: root.iconSizeLarge
-                connected: TailscaleService.isRunning
+                connected: TailscaleService.isRunning && !TailscaleService.operatorMissing
                 dotColor: Theme.widgetIconColor
             }
 
@@ -162,7 +171,7 @@ PluginComponent {
             }
 
             DankIcon {
-                visible: TailscaleService.needsLogin || TailscaleService.daemonDown
+                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing
                 name: "priority_high"
                 filled: true
                 size: barIconV.size * 0.55
@@ -178,6 +187,10 @@ PluginComponent {
     popoutContent: Component {
         PopoutComponent {
             id: popout
+
+            // Without operator rights every control here would fail, so the
+            // popout shows only the OperatorWarning until access is granted.
+            readonly property bool locked: TailscaleService.operatorMissing
 
             headerText: "Tailscale"
             detailsText: root.statusText
@@ -211,8 +224,14 @@ PluginComponent {
                 width: parent.width
                 spacing: Theme.spacingM
 
+                OperatorWarning {
+                    visible: popout.locked
+                    width: parent.width
+                }
+
                 // Connection card
                 StyledRect {
+                    visible: !popout.locked
                     width: parent.width
                     height: 64
                     radius: Theme.cornerRadius
@@ -255,7 +274,7 @@ PluginComponent {
                             hideText: true
                             checked: TailscaleService.isRunning
                             toggling: TailscaleService.busy
-                            enabled: !TailscaleService.daemonDown
+                            enabled: !TailscaleService.daemonDown && !TailscaleService.operatorMissing
                             onToggled: TailscaleService.toggleConnection()
                         }
 
@@ -276,7 +295,7 @@ PluginComponent {
 
                     property bool menuOpen: false
 
-                    visible: TailscaleService.accounts.length > 0
+                    visible: !popout.locked && TailscaleService.accounts.length > 0
                     width: parent.width
                     height: 52
                     radius: Theme.cornerRadius
@@ -357,7 +376,7 @@ PluginComponent {
 
                     property bool menuOpen: false
 
-                    visible: TailscaleService.isRunning
+                    visible: !popout.locked && TailscaleService.isRunning
                     width: parent.width
                     height: 52
                     radius: Theme.cornerRadius
@@ -441,6 +460,7 @@ PluginComponent {
                 }
 
                 StyledText {
+                    visible: !popout.locked
                     text: "Devices (" + root.popoutDevices.length + ")"
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.Medium
@@ -448,6 +468,7 @@ PluginComponent {
                 }
 
                 DankFlickable {
+                    visible: !popout.locked
                     width: parent.width
                     height: 260
                     clip: true
@@ -479,6 +500,7 @@ PluginComponent {
                 }
 
                 DankButton {
+                    visible: !popout.locked
                     width: parent.width
                     text: "Open Tailscale Manager"
                     iconName: "tune"
