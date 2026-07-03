@@ -104,7 +104,7 @@ PluginComponent {
             TailscaleLogo {
                 id: barIcon
                 anchors.centerIn: parent
-                size: root.iconSize - 4
+                size: root.iconSizeLarge - 4
                 connected: TailscaleService.isRunning
                 dotColor: Theme.widgetIconColor
             }
@@ -144,7 +144,7 @@ PluginComponent {
             TailscaleLogo {
                 id: barIconV
                 anchors.centerIn: parent
-                size: root.iconSize
+                size: root.iconSizeLarge
                 connected: TailscaleService.isRunning
                 dotColor: Theme.widgetIconColor
             }
