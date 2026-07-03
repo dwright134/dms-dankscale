@@ -1,0 +1,15 @@
+{
+    "id": "tailscale",
+    "name": "Tailscale",
+    "description": "Manage your Tailscale network: connect/disconnect, switch accounts, copy device IPs, pick exit nodes, and manage routes",
+    "version": "0.1.0",
+    "author": "dwright",
+    "icon": "apps",
+    "type": "widget",
+    "capabilities": ["dankbar-widget"],
+    "component": "./Tailscale.qml",
+    "settings": "./TailscaleSettings.qml",
+    "requires_dms": ">=1.4.0",
+    "requires": ["tailscale", "wl-copy"],
+    "permissions": ["settings_read", "settings_write", "process"]
+}
