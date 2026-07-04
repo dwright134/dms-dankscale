@@ -177,7 +177,10 @@ Singleton {
     function copyText(text) {
         if (!text)
             return;
-        Quickshell.execDetached(["wl-copy", text]);
+        // Use DMS's own clipboard CLI rather than wl-copy: `dms` is always
+        // present (it's running the shell), wl-clipboard is not a DMS
+        // dependency, and this routes the copy into DMS's clipboard history.
+        Quickshell.execDetached(["dms", "cl", "copy", text]);
         ToastService.showInfo("Copied " + text);
     }
 
