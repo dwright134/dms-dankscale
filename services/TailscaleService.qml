@@ -60,6 +60,8 @@ Singleton {
 
     readonly property var exitNodeCandidates: peers.filter(d => d.exitNodeOption)
     readonly property var activeExitNode: peers.find(d => d.exitNode) ?? null
+    // True when no exit node is selected — neither live nor a persisted pref.
+    readonly property bool noExitNodeSelected: !activeExitNode && prefExitNodeId === "" && prefExitNodeIp === ""
     readonly property var subnetRouters: allDevices.filter(d => d.routes.length > 0)
     readonly property int onlineCount: allDevices.filter(d => d.online).length
     readonly property int deviceCount: allDevices.length
@@ -85,6 +87,14 @@ Singleton {
     // --- config (bound from plugin settings) ---
     property int pollIntervalMs: 5000
     property string copyField: "ip"
+
+    // Watchdog: force-terminate a CLI call that runs longer than this, so a
+    // hung `tailscale` never leaves the widget stuck (busy stuck true, or a
+    // read proc stuck running which silently halts polling). Actions
+    // (up/down/set) get a longer leash than the read-only polls; login is
+    // excluded since it legitimately blocks on browser auth.
+    property int cliTimeoutMs: 15000
+    property int actionTimeoutMs: 60000
 
     function refresh() {
         if (!statusProc.running)
@@ -118,6 +128,12 @@ Singleton {
         const idx = accounts.findIndex(a => a.active);
         const next = accounts[(idx + 1) % accounts.length];
         switchAccount(next.account);
+    }
+
+    // True when the given peer is the selected exit node — matches the live
+    // ExitNode flag or the persisted pref (by id or ip).
+    function isExitNodeSelected(device) {
+        return device.exitNode || prefExitNodeId === device.id || (prefExitNodeIp !== "" && prefExitNodeIp === device.ip);
     }
 
     function setExitNode(ip, name) {
@@ -375,6 +391,42 @@ Singleton {
         onTriggered: root.refresh()
     }
 
+    // Watchdogs — each is armed while its process runs and fires only if the
+    // call overruns, killing it (which triggers the proc's onExited to reset
+    // state). repeat:true (not single-shot) so binding `running` to the proc
+    // isn't clobbered when the timer fires. Killing sets running=false again
+    // via the binding, so it never double-fires.
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: statusProc.running
+        onTriggered: statusProc.running = false
+    }
+
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: prefsProc.running
+        onTriggered: prefsProc.running = false
+    }
+
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: accountsProc.running
+        onTriggered: accountsProc.running = false
+    }
+
+    Timer {
+        interval: root.actionTimeoutMs
+        repeat: true
+        running: actionProc.running
+        onTriggered: {
+            actionProc.timedOut = true;
+            actionProc.running = false;
+        }
+    }
+
     Process {
         id: statusProc
         command: ["tailscale", "status", "--json"]
@@ -413,6 +465,7 @@ Singleton {
         id: actionProc
 
         property string successMessage: ""
+        property bool timedOut: false
 
         stdout: StdioCollector {
             id: actionOut
@@ -424,7 +477,10 @@ Singleton {
         }
         onExited: exitCode => {
             root.busy = false;
-            if (exitCode === 0) {
+            if (actionProc.timedOut) {
+                actionProc.timedOut = false;
+                ToastService.showError("Tailscale", "Command timed out");
+            } else if (exitCode === 0) {
                 if (actionProc.successMessage)
                     ToastService.showInfo(actionProc.successMessage);
             } else {
