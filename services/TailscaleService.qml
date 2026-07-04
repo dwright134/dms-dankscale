@@ -250,7 +250,25 @@ Singleton {
             return Math.floor(secs / 60) + " minutes";
         if (secs < 86400)
             return Math.floor(secs / 3600) + " hours";
-        return Math.floor(secs / 86400) + " days";
+        const days = Math.floor(secs / 86400);
+        if (days < 60)
+            return days + " days";
+        if (days < 365)
+            return Math.floor(days / 30) + " months";
+        return Math.floor(days / 365) + " years";
+    }
+
+    // Logs the active account out of Tailscale. The daemon drops to
+    // NeedsLogin and the account leaves the switch list, so the accounts UI
+    // falls back to its logged-out state on the next refresh.
+    function logout() {
+        runAction(["tailscale", "logout"], "Logged out of Tailscale");
+    }
+
+    // Opens the Tailscale admin console for the active tailnet.
+    function openAdminConsole() {
+        Quickshell.execDetached(["xdg-open", "https://login.tailscale.com/admin"]);
+        ToastService.showInfo("Opening Tailscale admin console");
     }
 
     // Opens the Tailscale admin console filtered to this machine so its
