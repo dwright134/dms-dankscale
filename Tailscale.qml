@@ -15,6 +15,8 @@ PluginComponent {
     readonly property bool showOffline: pluginData.showOffline === undefined ? true : pluginData.showOffline === true
 
     readonly property string statusText: {
+        if (TailscaleService.tailscaleMissing)
+            return "Tailscale is not installed";
         if (TailscaleService.operatorMissing)
             return "Operator access required";
         if (TailscaleService.needsLogin)
@@ -131,7 +133,7 @@ PluginComponent {
             }
 
             DankIcon {
-                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing
+                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing || TailscaleService.tailscaleMissing
                 name: "priority_high"
                 filled: true
                 size: barIcon.size * 0.55
@@ -171,7 +173,7 @@ PluginComponent {
             }
 
             DankIcon {
-                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing
+                visible: TailscaleService.needsLogin || TailscaleService.daemonDown || TailscaleService.operatorMissing || TailscaleService.tailscaleMissing
                 name: "priority_high"
                 filled: true
                 size: barIconV.size * 0.55
@@ -274,7 +276,7 @@ PluginComponent {
                             hideText: true
                             checked: TailscaleService.isRunning
                             toggling: TailscaleService.busy
-                            enabled: !TailscaleService.daemonDown && !TailscaleService.operatorMissing
+                            enabled: !TailscaleService.daemonDown && !TailscaleService.operatorMissing && !TailscaleService.tailscaleMissing
                             onToggled: TailscaleService.toggleConnection()
                         }
 

@@ -16,6 +16,14 @@ Singleton {
     readonly property bool daemonDown: backendState === "NoDaemon"
     property bool statusReady: false
 
+    // True when the `tailscale` CLI itself isn't on PATH. Detected separately
+    // because Quickshell's Process emits no onExited when the executable is
+    // missing — the status/prefs/accounts calls silently no-op, so without
+    // this probe the widget would sit on "Loading…" forever. Distinct from
+    // daemonDown (binary present, tailscaled not running).
+    property bool tailscaleMissing: false
+    property bool _binaryProbed: false
+
     // True when the current user lacks operator rights on the Tailscale
     // daemon — status (read-only) still works, but up/down/set would be
     // rejected with "Access denied: prefs write access denied". Surfaced as a
@@ -32,6 +40,8 @@ Singleton {
     property bool _operatorWarned: false
 
     readonly property string stateLabel: {
+        if (tailscaleMissing)
+            return "Tailscale not installed";
         switch (backendState) {
         case "Running":
             return "Connected";
@@ -97,6 +107,13 @@ Singleton {
     property int actionTimeoutMs: 60000
 
     function refresh() {
+        // Probe for the binary once at startup, then only while it's missing
+        // (so a later install is picked up) — no point re-checking every poll
+        // once we know it's present.
+        if (!_binaryProbed || tailscaleMissing) {
+            if (!whichProc.running)
+                whichProc.running = true;
+        }
         if (!statusProc.running)
             statusProc.running = true;
         if (!prefsProc.running)
@@ -191,6 +208,13 @@ Singleton {
     }
 
     function runAction(cmd, successMessage) {
+        // With no binary the exec would fail without an onExited, leaving
+        // busy stuck true (and the watchdog disarms before it can fire), so
+        // refuse up front rather than hang.
+        if (tailscaleMissing) {
+            ToastService.showError("Tailscale", "tailscale CLI not found");
+            return;
+        }
         if (busy) {
             ToastService.showWarning("Tailscale is busy, try again");
             return;
@@ -427,6 +451,21 @@ Singleton {
         onTriggered: {
             actionProc.timedOut = true;
             actionProc.running = false;
+        }
+    }
+
+    // Existence probe: `command -v` exits 0 if `tailscale` is on PATH, 1 if
+    // not. Runs via sh (always present), unlike the missing binary itself.
+    Process {
+        id: whichProc
+        command: ["sh", "-c", "command -v tailscale"]
+        onExited: exitCode => {
+            root._binaryProbed = true;
+            root.tailscaleMissing = exitCode !== 0;
+            // Nothing else will ever set statusReady when the binary is gone
+            // (the status Process emits no onExited), so unblock the UI here.
+            if (root.tailscaleMissing)
+                root.statusReady = true;
         }
     }
 
