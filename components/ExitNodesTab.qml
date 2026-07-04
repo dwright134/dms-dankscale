@@ -100,7 +100,7 @@ Item {
                 ExitOption {
                     title: "None"
                     subtitle: "Route traffic directly (no exit node)"
-                    selected: !TailscaleService.activeExitNode && TailscaleService.prefExitNodeId === "" && TailscaleService.prefExitNodeIp === ""
+                    selected: TailscaleService.noExitNodeSelected
                     onActivated: TailscaleService.setExitNode("", "")
                 }
 
@@ -112,7 +112,7 @@ Item {
                         title: modelData.name
                         subtitle: modelData.ip + (modelData.online ? "" : " • offline")
                         dimmed: !modelData.online
-                        selected: modelData.exitNode || TailscaleService.prefExitNodeId === modelData.id || (TailscaleService.prefExitNodeIp !== "" && TailscaleService.prefExitNodeIp === modelData.ip)
+                        selected: TailscaleService.isExitNodeSelected(modelData)
                         onActivated: TailscaleService.setExitNode(modelData.ip, modelData.name)
                     }
                 }

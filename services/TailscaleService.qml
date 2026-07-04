@@ -16,6 +16,14 @@ Singleton {
     readonly property bool daemonDown: backendState === "NoDaemon"
     property bool statusReady: false
 
+    // True when the `tailscale` CLI itself isn't on PATH. Detected separately
+    // because Quickshell's Process emits no onExited when the executable is
+    // missing — the status/prefs/accounts calls silently no-op, so without
+    // this probe the widget would sit on "Loading…" forever. Distinct from
+    // daemonDown (binary present, tailscaled not running).
+    property bool tailscaleMissing: false
+    property bool _binaryProbed: false
+
     // True when the current user lacks operator rights on the Tailscale
     // daemon — status (read-only) still works, but up/down/set would be
     // rejected with "Access denied: prefs write access denied". Surfaced as a
@@ -32,6 +40,8 @@ Singleton {
     property bool _operatorWarned: false
 
     readonly property string stateLabel: {
+        if (tailscaleMissing)
+            return "Tailscale not installed";
         switch (backendState) {
         case "Running":
             return "Connected";
@@ -60,6 +70,8 @@ Singleton {
 
     readonly property var exitNodeCandidates: peers.filter(d => d.exitNodeOption)
     readonly property var activeExitNode: peers.find(d => d.exitNode) ?? null
+    // True when no exit node is selected — neither live nor a persisted pref.
+    readonly property bool noExitNodeSelected: !activeExitNode && prefExitNodeId === "" && prefExitNodeIp === ""
     readonly property var subnetRouters: allDevices.filter(d => d.routes.length > 0)
     readonly property int onlineCount: allDevices.filter(d => d.online).length
     readonly property int deviceCount: allDevices.length
@@ -86,7 +98,22 @@ Singleton {
     property int pollIntervalMs: 5000
     property string copyField: "ip"
 
+    // Watchdog: force-terminate a CLI call that runs longer than this, so a
+    // hung `tailscale` never leaves the widget stuck (busy stuck true, or a
+    // read proc stuck running which silently halts polling). Actions
+    // (up/down/set) get a longer leash than the read-only polls; login is
+    // excluded since it legitimately blocks on browser auth.
+    property int cliTimeoutMs: 15000
+    property int actionTimeoutMs: 60000
+
     function refresh() {
+        // Probe for the binary once at startup, then only while it's missing
+        // (so a later install is picked up) — no point re-checking every poll
+        // once we know it's present.
+        if (!_binaryProbed || tailscaleMissing) {
+            if (!whichProc.running)
+                whichProc.running = true;
+        }
         if (!statusProc.running)
             statusProc.running = true;
         if (!prefsProc.running)
@@ -118,6 +145,12 @@ Singleton {
         const idx = accounts.findIndex(a => a.active);
         const next = accounts[(idx + 1) % accounts.length];
         switchAccount(next.account);
+    }
+
+    // True when the given peer is the selected exit node — matches the live
+    // ExitNode flag or the persisted pref (by id or ip).
+    function isExitNodeSelected(device) {
+        return device.exitNode || prefExitNodeId === device.id || (prefExitNodeIp !== "" && prefExitNodeIp === device.ip);
     }
 
     function setExitNode(ip, name) {
@@ -161,7 +194,10 @@ Singleton {
     function copyText(text) {
         if (!text)
             return;
-        Quickshell.execDetached(["wl-copy", text]);
+        // Use DMS's own clipboard CLI rather than wl-copy: `dms` is always
+        // present (it's running the shell), wl-clipboard is not a DMS
+        // dependency, and this routes the copy into DMS's clipboard history.
+        Quickshell.execDetached(["dms", "cl", "copy", text]);
         ToastService.showInfo("Copied " + text);
     }
 
@@ -172,6 +208,13 @@ Singleton {
     }
 
     function runAction(cmd, successMessage) {
+        // With no binary the exec would fail without an onExited, leaving
+        // busy stuck true (and the watchdog disarms before it can fire), so
+        // refuse up front rather than hang.
+        if (tailscaleMissing) {
+            ToastService.showError("Tailscale", "tailscale CLI not found");
+            return;
+        }
         if (busy) {
             ToastService.showWarning("Tailscale is busy, try again");
             return;
@@ -375,6 +418,57 @@ Singleton {
         onTriggered: root.refresh()
     }
 
+    // Watchdogs — each is armed while its process runs and fires only if the
+    // call overruns, killing it (which triggers the proc's onExited to reset
+    // state). repeat:true (not single-shot) so binding `running` to the proc
+    // isn't clobbered when the timer fires. Killing sets running=false again
+    // via the binding, so it never double-fires.
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: statusProc.running
+        onTriggered: statusProc.running = false
+    }
+
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: prefsProc.running
+        onTriggered: prefsProc.running = false
+    }
+
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: accountsProc.running
+        onTriggered: accountsProc.running = false
+    }
+
+    Timer {
+        interval: root.actionTimeoutMs
+        repeat: true
+        running: actionProc.running
+        onTriggered: {
+            actionProc.timedOut = true;
+            actionProc.running = false;
+        }
+    }
+
+    // Existence probe: `command -v` exits 0 if `tailscale` is on PATH, 1 if
+    // not. Runs via sh (always present), unlike the missing binary itself.
+    Process {
+        id: whichProc
+        command: ["sh", "-c", "command -v tailscale"]
+        onExited: exitCode => {
+            root._binaryProbed = true;
+            root.tailscaleMissing = exitCode !== 0;
+            // Nothing else will ever set statusReady when the binary is gone
+            // (the status Process emits no onExited), so unblock the UI here.
+            if (root.tailscaleMissing)
+                root.statusReady = true;
+        }
+    }
+
     Process {
         id: statusProc
         command: ["tailscale", "status", "--json"]
@@ -413,6 +507,7 @@ Singleton {
         id: actionProc
 
         property string successMessage: ""
+        property bool timedOut: false
 
         stdout: StdioCollector {
             id: actionOut
@@ -424,7 +519,10 @@ Singleton {
         }
         onExited: exitCode => {
             root.busy = false;
-            if (exitCode === 0) {
+            if (actionProc.timedOut) {
+                actionProc.timedOut = false;
+                ToastService.showError("Tailscale", "Command timed out");
+            } else if (exitCode === 0) {
                 if (actionProc.successMessage)
                     ToastService.showInfo(actionProc.successMessage);
             } else {

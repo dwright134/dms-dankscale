@@ -83,7 +83,7 @@ StyledRect {
         MenuOption {
             title: "None"
             subtitle: "direct"
-            selected: !TailscaleService.activeExitNode && TailscaleService.prefExitNodeId === "" && TailscaleService.prefExitNodeIp === ""
+            selected: TailscaleService.noExitNodeSelected
             onActivated: {
                 TailscaleService.setExitNode("", "");
                 menu.dismissed();
@@ -98,7 +98,7 @@ StyledRect {
                 title: modelData.name
                 subtitle: modelData.online ? modelData.ip : "offline"
                 dimmed: !modelData.online
-                selected: modelData.exitNode || TailscaleService.prefExitNodeId === modelData.id || (TailscaleService.prefExitNodeIp !== "" && TailscaleService.prefExitNodeIp === modelData.ip)
+                selected: TailscaleService.isExitNodeSelected(modelData)
                 onActivated: {
                     TailscaleService.setExitNode(modelData.ip, modelData.name);
                     menu.dismissed();
