@@ -36,6 +36,16 @@ Singleton {
     // Shown and copied literally — $USER expands in the user's own terminal.
     readonly property string operatorFixCommand: "sudo tailscale set --operator=$USER"
 
+    // `tailscale login` is a *profile* operation and needs root — a non-root
+    // login can't persist OperatorUser, so it silently strips this user's
+    // operator rights (after which the daemon rejects every later up/down/set
+    // and the UI locks to the OperatorWarning). So login is run through pkexec
+    // (the DMS polkit agent prompts), and --operator=$USER is passed so the
+    // root login re-establishes operator in the same step. Operator itself is
+    // what lets up/down/set run *without* root, so those stay unprivileged.
+    // Skipped for root (never needs an operator) and when the user is unknown.
+    readonly property var operatorArgs: (currentUser && currentUser !== "root") ? ["--operator=" + currentUser] : []
+
     // Suppresses repeated operator-warning toasts while the condition persists.
     property bool _operatorWarned: false
 
@@ -78,7 +88,29 @@ Singleton {
 
     // --- accounts ---
     property var accounts: []                   // { id, tailnet, account, active }
-    property string currentAccount: ""
+    property string currentAccount: ""          // the active (*-marked) profile; "" when logged out
+
+    // Remembered so the UI still knows which account is "current" when logged
+    // out: Tailscale drops the active (*) marker from `switch --list` once a
+    // profile needs login, which would otherwise leave the popout showing "No
+    // account" even though a profile plainly exists. Seeded from persisted
+    // plugin settings by the widget and refreshed whenever a profile is active.
+    property string lastActiveAccount: ""
+
+    // The account the UI treats as selected/current. Never blank while profiles
+    // exist: the active profile, else the last one that was active (if still
+    // present), else the sole/first profile. The connection card independently
+    // shows the Log in button off backendState, so a logged-out selection still
+    // reads correctly.
+    readonly property string effectiveAccount: {
+        const active = accounts.find(a => a.active);
+        if (active)
+            return active.account;
+        if (accounts.length === 0)
+            return "";
+        const remembered = accounts.find(a => a.account === lastActiveAccount);
+        return (remembered || accounts[0]).account;
+    }
 
     // --- prefs ---
     property bool acceptRoutes: false
@@ -105,6 +137,12 @@ Singleton {
     // excluded since it legitimately blocks on browser auth.
     property int cliTimeoutMs: 15000
     property int actionTimeoutMs: 60000
+
+    // Login runs as root via pkexec, and a non-root parent can't signal a root
+    // child — so neither the Cancel button nor a Process kill can stop it.
+    // This bounds an abandoned login (browser auth never completed) so the
+    // root process can't linger indefinitely; real sign-ins finish well within.
+    property int loginTimeoutSecs: 180
 
     function refresh() {
         // Probe for the binary once at startup, then only while it's missing
@@ -176,7 +214,10 @@ Singleton {
     }
 
     function startLogin() {
-        if (loginInProgress)
+        // Also guard on the process itself: a cancelled login keeps its root
+        // pkexec child alive (we can't signal it) until `timeout` reaps it, so
+        // block a restart until it has actually exited.
+        if (loginInProgress || loginProc.running)
             return;
         authUrl = "";
         _loginCancelled = false;
@@ -185,10 +226,19 @@ Singleton {
     }
 
     function cancelLogin() {
-        if (loginProc.running) {
-            _loginCancelled = true;
-            loginProc.signal(2);
-        }
+        if (!loginProc.running)
+            return;
+        _loginCancelled = true;
+        // The login runs as root under pkexec, so a signal from this non-root
+        // process can't reach it. End it daemon-side instead: selecting an
+        // existing profile stops the interactive-login watch, so the blocked
+        // `tailscale login` returns and the pkexec process exits. During login
+        // the operator pref is already set (login passes --operator), so this
+        // unprivileged `switch` is permitted. If there's no profile to switch
+        // to (very first login), the command's own `timeout` is the backstop.
+        loginProc.signal(2);
+        if (effectiveAccount)
+            Quickshell.execDetached(["tailscale", "switch", effectiveAccount]);
     }
 
     function copyText(text) {
@@ -378,6 +428,10 @@ Singleton {
         }
         accounts = list;
         currentAccount = current;
+        // Keep the fallback fresh while an account is active, so it's accurate
+        // the moment the profile later drops to needs-login.
+        if (current)
+            lastActiveAccount = current;
     }
 
     function _handlePrefs(exitCode, out) {
@@ -401,10 +455,30 @@ Singleton {
         // mutating commands (up/down/set) are rejected even though status
         // still works. Root always has access. If we can't determine the
         // current user, fall back to just checking that an operator is set.
-        if (currentUser === "root")
+        //
+        // Only meaningful while logged in, though: the daemon clears the
+        // operator on logout (it doesn't persist with no active profile) and
+        // login re-establishes it, so a missing operator while logged out is
+        // expected — surfacing it would fire a bogus warning toast and lock the
+        // UI (hiding the account) every time you sign out.
+        if (currentUser === "root" || p.LoggedOut)
             setOperatorMissing(false);
         else
             setOperatorMissing(currentUser ? p.OperatorUser !== currentUser : !p.OperatorUser);
+    }
+
+    // One-click operator grant. Runs the same `tailscale set --operator=$USER`
+    // as the copyable fallback command, but through pkexec so the session's
+    // polkit agent (DMS registers one) shows a graphical password prompt
+    // instead of the user needing a terminal. $USER can't expand here (no
+    // shell, and pkexec runs as root anyway), so the resolved username is
+    // passed literally. refresh() after unlocks the UI without waiting a poll.
+    function grantOperator() {
+        if (!currentUser || currentUser === "root")
+            return;
+        if (grantProc.running)
+            return;
+        grantProc.running = true;
     }
 
     function setOperatorMissing(missing) {
@@ -557,8 +631,33 @@ Singleton {
     }
 
     Process {
+        id: grantProc
+        command: ["pkexec", "tailscale", "set", "--operator=" + root.currentUser]
+        stderr: StdioCollector {
+            id: grantErr
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            if (exitCode === 0) {
+                ToastService.showInfo("Operator access granted");
+            } else {
+                // pkexec exits non-zero and prints nothing when the user just
+                // dismisses the prompt — only surface an error when there's
+                // actual stderr (a real auth or command failure).
+                const msg = (grantErr.text || "").trim().split("\n")[0];
+                if (msg)
+                    ToastService.showError("Tailscale", msg);
+            }
+            root.refresh();
+        }
+    }
+
+    Process {
         id: loginProc
-        command: ["tailscale", "login"]
+        // pkexec → root; `timeout` (also root) is the only thing that can stop
+        // an abandoned login, since this non-root process can't signal its own
+        // root child. --operator=$USER re-establishes operator during login.
+        command: ["pkexec", "timeout", String(root.loginTimeoutSecs), "tailscale", "login"].concat(root.operatorArgs)
         stdout: SplitParser {
             onRead: data => root._handleLoginLine(data)
         }
@@ -568,10 +667,16 @@ Singleton {
         onExited: exitCode => {
             root.loginInProgress = false;
             root.authUrl = "";
-            if (exitCode === 0)
+            if (exitCode === 0) {
                 ToastService.showInfo("Logged in to Tailscale");
-            else if (!root._loginCancelled)
+            } else if (exitCode === 126 || exitCode === 127) {
+                // pkexec: user dismissed the password prompt or auth failed —
+                // not an error worth a toast, they chose not to proceed.
+            } else if (exitCode === 124 || root._loginCancelled) {
+                // timeout killed an abandoned login, or the user hit Cancel.
+            } else {
                 ToastService.showError("Tailscale login failed");
+            }
             root._loginCancelled = false;
             root.refresh();
         }

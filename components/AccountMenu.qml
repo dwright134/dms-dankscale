@@ -96,12 +96,15 @@ StyledRect {
 
             MenuRow {
                 required property var modelData
-                iconName: modelData.active ? "radio_button_checked" : "radio_button_unchecked"
-                iconColor: modelData.active ? Theme.primary : Theme.surfaceVariantText
+                // Selected follows the effective account, so the current
+                // profile still reads as chosen when logged out (no * marker).
+                readonly property bool selected: modelData.account === TailscaleService.effectiveAccount
+                iconName: selected ? "radio_button_checked" : "radio_button_unchecked"
+                iconColor: selected ? Theme.primary : Theme.surfaceVariantText
                 title: modelData.account
-                subtitle: modelData.active ? "active" : ""
+                subtitle: modelData.active ? "active" : (selected ? "signed out" : "")
                 onActivated: {
-                    if (!modelData.active) {
+                    if (!selected) {
                         TailscaleService.switchAccount(modelData.account);
                         menu.dismissed();
                     }

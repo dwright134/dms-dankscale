@@ -45,6 +45,24 @@ PluginComponent {
         value: root.copyPreference
     }
 
+    // Persist which account was last active so the popout can still show it as
+    // selected after a restart while logged out (Tailscale stops marking any
+    // profile active once it needs login). Seed the service's fallback from
+    // settings before any account goes active this session.
+    onPluginDataChanged: {
+        if (pluginData && pluginData.lastAccount && !TailscaleService.lastActiveAccount)
+            TailscaleService.lastActiveAccount = pluginData.lastAccount;
+    }
+
+    Connections {
+        target: TailscaleService
+        function onCurrentAccountChanged() {
+            const acct = TailscaleService.currentAccount;
+            if (acct && root.pluginService && root.pluginData.lastAccount !== acct)
+                root.pluginService.savePluginData(root.pluginId, "lastAccount", acct);
+        }
+    }
+
     // Control center tile
     ccWidgetIcon: "apps"
     ccWidgetPrimaryText: "Tailscale"
@@ -331,7 +349,7 @@ PluginComponent {
                         StyledText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: TailscaleService.currentAccount || "No account"
+                            text: TailscaleService.effectiveAccount || "No account"
                         }
 
                         StyledText {

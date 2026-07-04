@@ -32,6 +32,17 @@ DankModal {
     closeOnBackgroundClick: true
     onBackgroundClicked: close()
 
+    // Starting a login raises a polkit password prompt, which would otherwise
+    // appear behind this modal (and the modal can't be dragged aside). Close
+    // on login start so the prompt — and then the browser — are reachable.
+    Connections {
+        target: TailscaleService
+        function onLoginInProgressChanged() {
+            if (TailscaleService.loginInProgress)
+                modal.close();
+        }
+    }
+
     content: Component {
         Item {
             anchors.fill: parent

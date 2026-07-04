@@ -2,10 +2,11 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 
-// Full-view notice shown instead of any Tailscale details while the current
-// user lacks operator rights on the daemon — every mutating command would be
-// rejected, so nothing is shown until access is granted. The command box
-// copies the exact grant command (with the session's username) on click.
+// Full-view notice shown instead of any Tailscale details while the user is
+// logged in but lacks operator rights on the daemon — every mutating command
+// would be rejected, so nothing is shown until access is granted. (When logged
+// out, operator isn't treated as missing; the normal card offers Log in, which
+// re-establishes operator itself.) The command box copies the grant command.
 Column {
     id: root
 
@@ -31,7 +32,23 @@ Column {
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
-        text: "Your user isn't allowed to control the Tailscale daemon. Run this once in a terminal and this view will unlock automatically:"
+        text: "Your user isn't allowed to control the Tailscale daemon. Grant access below (you'll be prompted for your password) and this view unlocks automatically."
+        font.pixelSize: Theme.fontSizeSmall
+        color: Theme.surfaceVariantText
+    }
+
+    DankButton {
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "Grant access"
+        iconName: "admin_panel_settings"
+        onClicked: TailscaleService.grantOperator()
+    }
+
+    StyledText {
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        text: "Or run this once in a terminal:"
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
     }

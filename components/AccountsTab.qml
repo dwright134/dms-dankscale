@@ -230,6 +230,10 @@ Item {
 
                     readonly property var account: tab.selectedAccount
                     readonly property bool isActive: account?.active ?? false
+                    // The profile the daemon is currently on — active while
+                    // logged in, and still "current" when logged out (Tailscale
+                    // drops the * marker then). Matches the popout's selection.
+                    readonly property bool isCurrent: !!account && account.account === TailscaleService.effectiveAccount
                     // Full status/expiry data only exists for the active
                     // account (it's the one `tailscale status` describes).
                     readonly property bool loggedIn: isActive && !TailscaleService.needsLogin
@@ -319,7 +323,7 @@ Item {
 
                                 StyledText {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: detailCol.isActive ? (detailCol.loggedIn ? "Logged In" : "Login required") : "Inactive account"
+                                    text: detailCol.loggedIn ? "Logged In" : (detailCol.isCurrent ? "Login required" : "Inactive account")
                                 }
                             }
 
@@ -347,9 +351,21 @@ Item {
                                 }
                             }
 
-                            // Inactive account: switch to it.
+                            // Current profile but logged out: sign back in.
                             DankButton {
-                                visible: !detailCol.isActive
+                                visible: detailCol.isCurrent && !detailCol.isActive
+                                text: TailscaleService.loginInProgress ? "Signing in…" : "Log In"
+                                iconName: "login"
+                                backgroundColor: Theme.surfaceVariantAlpha
+                                textColor: Theme.surfaceText
+                                buttonHeight: 30
+                                enabled: !TailscaleService.loginInProgress
+                                onClicked: TailscaleService.startLogin()
+                            }
+
+                            // A different, inactive profile: switch to it.
+                            DankButton {
+                                visible: !detailCol.isCurrent
                                 text: "Switch to This Account"
                                 iconName: "switch_account"
                                 backgroundColor: Theme.surfaceVariantAlpha
