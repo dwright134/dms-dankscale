@@ -30,7 +30,6 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 
 - DankMaterialShell ≥ 1.4.0
 - `tailscale` CLI with `tailscaled` running
-- `wl-copy` (wl-clipboard)
 - Your user set as the Tailscale operator so no root prompts are needed:
 
   ```sh

@@ -15,6 +15,6 @@
     "component": "./Tailscale.qml",
     "settings": "./TailscaleSettings.qml",
     "requires_dms": ">=1.4.0",
-    "requires": ["tailscale", "wl-copy"],
+    "requires": ["tailscale"],
     "permissions": ["settings_read", "settings_write", "process"]
 }
