@@ -5,6 +5,11 @@
     "version": "0.2.0",
     "author": "dwright",
     "icon": "apps",
+    "screenshot": "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/screenshot.png",
+    "screenshots": [
+        "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/screenshot.png",
+        "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/manager.png"
+    ],
     "type": "widget",
     "capabilities": ["dankbar-widget", "control-center", "vpn", "network"],
     "component": "./Tailscale.qml",

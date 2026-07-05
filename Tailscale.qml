@@ -498,34 +498,43 @@ PluginComponent {
                     color: Theme.surfaceVariantText
                 }
 
-                DankFlickable {
+                StyledRect {
                     visible: !popout.locked
                     width: parent.width
                     height: 260
-                    clip: true
-                    contentHeight: popoutDeviceCol.height
+                    radius: Theme.cornerRadius
+                    color: Theme.surfaceContainerHigh
 
-                    Column {
-                        id: popoutDeviceCol
-                        width: parent.width
-                        spacing: 2
+                    DankFlickable {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingXS
+                        clip: true
+                        contentHeight: popoutDeviceCol.height
 
-                        Repeater {
-                            model: root.popoutDevices
+                        Column {
+                            id: popoutDeviceCol
+                            width: parent.width
+                            spacing: 2
 
-                            DeviceRow {
-                                required property var modelData
-                                width: parent.width
-                                device: modelData
-                                compact: true
-                                onActivated: TailscaleService.copyDevice(modelData)
+                            Repeater {
+                                model: root.popoutDevices
+
+                                DeviceRow {
+                                    required property var modelData
+                                    width: parent.width
+                                    device: modelData
+                                    compact: true
+                                    onActivated: TailscaleService.copyDevice(modelData)
+                                }
                             }
-                        }
 
-                        StyledText {
-                            visible: root.popoutDevices.length === 0
-                            text: TailscaleService.statusReady ? "No devices" : "Loading…"
-                            color: Theme.surfaceVariantText
+                            StyledText {
+                                visible: root.popoutDevices.length === 0
+                                text: TailscaleService.statusReady ? "No devices" : "Loading…"
+                                color: Theme.surfaceVariantText
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacingM
+                            }
                         }
                     }
                 }
