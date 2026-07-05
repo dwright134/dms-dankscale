@@ -65,7 +65,7 @@ PluginComponent {
 
     // Control center tile
     ccWidgetIcon: "apps"
-    ccWidgetPrimaryText: "Tailscale"
+    ccWidgetPrimaryText: "Dankscale"
     ccWidgetSecondaryText: statusText
     ccWidgetIsActive: TailscaleService.isRunning
     ccWidgetIsToggle: true
@@ -212,7 +212,7 @@ PluginComponent {
             // popout shows only the OperatorWarning until access is granted.
             readonly property bool locked: TailscaleService.operatorMissing
 
-            headerText: "Tailscale"
+            headerText: "Dankscale"
             detailsText: root.statusText
             showCloseButton: true
 
@@ -233,7 +233,7 @@ PluginComponent {
                         iconName: "open_in_new"
                         iconColor: Theme.surfaceVariantText
                         buttonSize: 28
-                        tooltipText: "Open Tailscale Manager"
+                        tooltipText: "Open Manager"
                         tooltipSide: "bottom"
                         onClicked: root.openManager()
                     }
@@ -522,7 +522,7 @@ PluginComponent {
                 DankButton {
                     visible: !popout.locked
                     width: parent.width
-                    text: "Open Tailscale Manager"
+                    text: "Open Manager"
                     iconName: "tune"
                     onClicked: root.openManager()
                 }

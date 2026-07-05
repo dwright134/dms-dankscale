@@ -75,7 +75,7 @@ DankModal {
                     spacing: 2
 
                     StyledText {
-                        text: "Tailscale"
+                        text: "Dankscale"
                         font.pixelSize: Theme.fontSizeLarge
                         font.weight: Font.Bold
                     }

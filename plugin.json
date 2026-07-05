@@ -1,6 +1,6 @@
 {
-    "id": "tailscaleControl",
-    "name": "Tailscale Control",
+    "id": "dankscale",
+    "name": "Dankscale",
     "description": "Manage your Tailscale network: connect/disconnect, switch accounts, copy device IPs, pick exit nodes, and manage routes",
     "version": "0.1.2",
     "author": "dwright",
