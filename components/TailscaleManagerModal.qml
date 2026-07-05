@@ -129,6 +129,7 @@ DankModal {
                     { text: "Devices", icon: "devices" },
                     { text: "Exit Nodes", icon: "vpn_lock" },
                     { text: "Routes", icon: "alt_route" },
+                    { text: "DNS", icon: "dns" },
                     { text: "Accounts", icon: "switch_account" }
                 ]
             }
@@ -167,6 +168,8 @@ DankModal {
                     case 2:
                         return routesTabComp;
                     case 3:
+                        return dnsTabComp;
+                    case 4:
                         return accountsTabComp;
                     default:
                         return devicesTabComp;
@@ -187,6 +190,11 @@ DankModal {
             Component {
                 id: routesTabComp
                 RoutesTab {}
+            }
+
+            Component {
+                id: dnsTabComp
+                DnsTab {}
             }
 
             Component {
