@@ -7,7 +7,7 @@ import qs.Modules.Settings.Widgets
 PluginSettings {
     id: settingsRoot
 
-    pluginId: "tailscale"
+    pluginId: "tailscaleControl"
 
     SettingsCard {
         title: "Widget"

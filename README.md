@@ -1,6 +1,8 @@
-# Tailscale for DankMaterialShell
+# Tailscale Control
 
 A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from the bar — a Linux stand-in for the macOS menu-bar app and settings utility.
+
+![Tailscale Control](docs/screenshot.png)
 
 ## Features
 
@@ -34,11 +36,15 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 
 ## Install
 
+**From the plugin browser** — search for **Tailscale Control** in DMS Settings → Plugins and install it.
+
+**Manually** — clone into your DMS plugins directory:
+
 ```sh
-ln -s /path/to/dms-tailscale ~/.config/DankMaterialShell/plugins/Tailscale
+git clone https://github.com/dwright134/dms-tailscale ~/.config/DankMaterialShell/plugins/TailscaleControl
 ```
 
-Then enable **Tailscale** under Settings → Plugins.
+Then enable **Tailscale Control** under Settings → Plugins.
 
 ## Settings
 
@@ -56,3 +62,7 @@ Everything is driven by the `tailscale` CLI — no daemons, no external helpers:
 - `tailscale up` / `down` — connect / disconnect
 - `tailscale set --exit-node=… --accept-routes=… --advertise-routes=…` — settings
 - `tailscale login` — add account (auth URL opens in your browser automatically)
+
+## License
+
+[MIT](LICENSE)
