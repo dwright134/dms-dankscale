@@ -122,6 +122,17 @@ PluginComponent {
                 detectedUser: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
             });
         }
+
+        function dns(): string {
+            return JSON.stringify({
+                acceptDns: TailscaleService.acceptDns,
+                magicDnsEnabled: TailscaleService.magicDnsEnabled,
+                magicDnsSuffix: TailscaleService.magicDnsSuffix,
+                selfDnsName: TailscaleService.dnsSelfName,
+                searchDomains: TailscaleService.dnsSearchDomains,
+                splitDns: TailscaleService.dnsSplitRoutes
+            });
+        }
     }
 
     horizontalBarPill: Component {
@@ -385,7 +396,7 @@ PluginComponent {
                         onDismissed: acctCard.menuOpen = false
                         onOpenSettings: {
                             acctCard.menuOpen = false;
-                            root.openManager(3);
+                            root.openManager(4);
                         }
                     }
                 }

@@ -19,6 +19,7 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 - **Devices** — filterable list of every device on the tailnet with online status, OS, owner, subnet/exit-node badges; click to copy address
 - **Exit Nodes** — pick or clear the exit node, allow-LAN-access toggle, advertise this device as an exit node
 - **Routes** — accept-routes toggle, advertise subnet routes from this device, list of subnet routers on the tailnet
+- **DNS** — "Use Tailscale DNS" toggle, current DNS configuration (MagicDNS state, suffix, this device's DNS name, search domains, split-DNS routes), and a DNS lookup tool that resolves names through the tailnet resolver
 - **Accounts** — switch between logged-in accounts, add a new account (opens browser sign-in)
 
 ![Manager](docs/manager.png)
@@ -59,10 +60,12 @@ Then enable **Dankscale** under Settings → Plugins.
 Everything is driven by the `tailscale` CLI — no daemons, no external helpers:
 
 - `tailscale status --json` — device list, connection state, exit node
-- `tailscale debug prefs` — accept-routes, advertised routes, exit-node prefs
+- `tailscale debug prefs` — accept-routes, advertised routes, exit-node and accept-dns prefs
+- `tailscale dns status --json` — MagicDNS state, suffix, search domains, split-DNS routes
+- `tailscale dns query <name> [type]` — DNS lookup tool
 - `tailscale switch --list` / `tailscale switch <account>` — accounts
 - `tailscale up` / `down` — connect / disconnect
-- `tailscale set --exit-node=… --accept-routes=… --advertise-routes=…` — settings
+- `tailscale set --exit-node=… --accept-routes=… --advertise-routes=… --accept-dns=…` — settings
 - `tailscale login` — add account (auth URL opens in your browser automatically)
 
 ## License

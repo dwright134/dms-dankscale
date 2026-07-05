@@ -120,6 +120,24 @@ Singleton {
     property string prefExitNodeId: ""
     property string prefExitNodeIp: ""
 
+    // --- dns ---
+    // "Use Tailscale DNS" — whether this device accepts the DNS configuration
+    // pushed by the coordination server (MagicDNS, split-DNS, search domains).
+    // Maps to the CorpDNS pref / `tailscale set --accept-dns`.
+    property bool acceptDns: false
+    property bool dnsStatusReady: false
+    // Whether MagicDNS is enabled tailnet-wide (an admin-console setting, not a
+    // per-device pref) — the name→IP magic only works when this is on.
+    property bool magicDnsEnabled: false
+    // This device's fully-qualified MagicDNS name (trailing dot stripped).
+    property string dnsSelfName: ""
+    property var dnsSearchDomains: []           // extra domains appended to bare lookups
+    property var dnsSplitRoutes: []             // { domain, resolvers } — per-domain resolvers
+
+    // --- dns query tool ---
+    property string dnsQueryResult: ""
+    property bool dnsQuerying: false
+
     // --- transient ui state ---
     property bool busy: false
     property bool loginInProgress: false
@@ -158,6 +176,8 @@ Singleton {
             prefsProc.running = true;
         if (!accountsProc.running)
             accountsProc.running = true;
+        if (!dnsStatusProc.running)
+            dnsStatusProc.running = true;
     }
 
     function toggleConnection() {
@@ -201,6 +221,40 @@ Singleton {
 
     function setAcceptRoutes(accept) {
         runAction(["tailscale", "set", "--accept-routes=" + accept], "");
+    }
+
+    // Toggles "Use Tailscale DNS" (`--accept-dns`). When on, the daemon applies
+    // the tailnet's DNS configuration (MagicDNS, split-DNS, search domains);
+    // when off it reverts to the system default resolver.
+    function setAcceptDns(accept) {
+        runAction(["tailscale", "set", "--accept-dns=" + accept], accept ? "Using Tailscale DNS" : "Using system DNS");
+    }
+
+    // Read-only DNS lookup via the tailnet resolver (100.100.100.100). Runs on
+    // its own process (not the mutating actionProc) since it produces output to
+    // display and never changes state. `type` is an optional record type
+    // (A, AAAA, CNAME, MX, TXT, …); empty means the CLI default (A).
+    function runDnsQuery(name, type) {
+        name = (name || "").trim();
+        if (!name || dnsQuerying)
+            return;
+        if (tailscaleMissing) {
+            dnsQueryResult = "tailscale CLI not found";
+            return;
+        }
+        const cmd = ["tailscale", "dns", "query", name];
+        const t = (type || "").trim().toUpperCase();
+        if (t)
+            cmd.push(t);
+        dnsQueryResult = "";
+        dnsQuerying = true;
+        dnsQueryProc.command = cmd;
+        dnsQueryProc.running = true;
+    }
+
+    // Clears the last DNS lookup result from the tab.
+    function clearDnsQuery() {
+        dnsQueryResult = "";
     }
 
     function setAdvertiseExitNode(advertise) {
@@ -444,6 +498,7 @@ Singleton {
             return;
         }
         acceptRoutes = !!p.RouteAll;
+        acceptDns = !!p.CorpDNS;
         exitNodeAllowLan = !!p.ExitNodeAllowLANAccess;
         prefExitNodeId = p.ExitNodeID || "";
         prefExitNodeIp = p.ExitNodeIP || "";
@@ -465,6 +520,45 @@ Singleton {
             setOperatorMissing(false);
         else
             setOperatorMissing(currentUser ? p.OperatorUser !== currentUser : !p.OperatorUser);
+    }
+
+    function _handleDnsStatus(exitCode, out) {
+        dnsStatusReady = true;
+        if (exitCode !== 0) {
+            magicDnsEnabled = false;
+            dnsSelfName = "";
+            dnsSearchDomains = [];
+            dnsSplitRoutes = [];
+            return;
+        }
+        let d;
+        try {
+            d = JSON.parse(out);
+        } catch (e) {
+            return;
+        }
+        const tn = d.CurrentTailnet || {};
+        magicDnsEnabled = !!tn.MagicDNSEnabled;
+        dnsSelfName = (tn.SelfDNSName || "").replace(/\.$/, "");
+        dnsSearchDomains = (d.SearchDomains || []).slice();
+        const routes = d.SplitDNSRoutes || {};
+        const list = [];
+        for (const domain in routes) {
+            const resolvers = routes[domain];
+            // Each resolver is an object like { Addr: "1.2.3.4" } (Addr may be an
+            // IP, IP:port, or a DoH URL) — not a bare string — so pull the Addr.
+            const parts = (Array.isArray(resolvers) ? resolvers : [resolvers]).map(r => {
+                if (r && typeof r === "object")
+                    return r.Addr || JSON.stringify(r);
+                return String(r);
+            });
+            list.push({
+                domain: domain.replace(/\.$/, ""),
+                resolvers: parts.join(", ")
+            });
+        }
+        list.sort((a, b) => a.domain.localeCompare(b.domain));
+        dnsSplitRoutes = list;
     }
 
     // One-click operator grant. Runs the same `tailscale set --operator=$USER`
@@ -537,6 +631,20 @@ Singleton {
     }
 
     Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: dnsStatusProc.running
+        onTriggered: dnsStatusProc.running = false
+    }
+
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: dnsQueryProc.running
+        onTriggered: dnsQueryProc.running = false
+    }
+
+    Timer {
         interval: root.actionTimeoutMs
         repeat: true
         running: actionProc.running
@@ -593,6 +701,37 @@ Singleton {
             waitForEnd: true
         }
         onExited: exitCode => root._handleAccounts(exitCode, accountsOut.text)
+    }
+
+    Process {
+        id: dnsStatusProc
+        command: ["tailscale", "dns", "status", "--json"]
+        stdout: StdioCollector {
+            id: dnsStatusOut
+            waitForEnd: true
+        }
+        onExited: exitCode => root._handleDnsStatus(exitCode, dnsStatusOut.text)
+    }
+
+    Process {
+        id: dnsQueryProc
+        stdout: StdioCollector {
+            id: dnsQueryOut
+            waitForEnd: true
+        }
+        stderr: StdioCollector {
+            id: dnsQueryErr
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            root.dnsQuerying = false;
+            const out = (dnsQueryOut.text || "").trim();
+            const err = (dnsQueryErr.text || "").trim();
+            // The query CLI prints its human-readable result to stdout even on a
+            // failed lookup (e.g. RCodeServerFailure), so prefer stdout and fall
+            // back to stderr only when it's empty.
+            root.dnsQueryResult = out || err || (exitCode === 0 ? "No output" : "Query failed (exit " + exitCode + ")");
+        }
     }
 
     Process {
