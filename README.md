@@ -44,7 +44,7 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 **Manually** — clone into your DMS plugins directory:
 
 ```sh
-git clone https://github.com/dwright134/dms-tailscale ~/.config/DankMaterialShell/plugins/Dankscale
+git clone https://github.com/dwright134/dms-dankscale ~/.config/DankMaterialShell/plugins/Dankscale
 ```
 
 Then enable **Dankscale** under Settings → Plugins.
