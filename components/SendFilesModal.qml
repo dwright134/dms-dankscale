@@ -36,6 +36,9 @@ DankModal {
     modalWidth: 460
     modalHeight: 520
     enableShadow: true
+    // No dimming scrim behind the modal — click-outside-to-close still works
+    // (it's a separate click catcher, not the background).
+    showBackground: false
     closeOnEscapeKey: true
     closeOnBackgroundClick: true
     // Keep the content (and the staged list) alive while we hide the modal to
