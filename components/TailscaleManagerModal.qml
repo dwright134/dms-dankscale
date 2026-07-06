@@ -8,6 +8,10 @@ DankModal {
 
     property int currentTab: 0
 
+    // Bubbled up so the root widget can open the send-files dialog for a device
+    // picked from the Devices tab.
+    signal sendRequested(var device)
+
     readonly property string statusLine: {
         if (TailscaleService.operatorMissing)
             return "Operator access required";
@@ -179,7 +183,9 @@ DankModal {
 
             Component {
                 id: devicesTabComp
-                DevicesTab {}
+                DevicesTab {
+                    onSendRequested: device => modal.sendRequested(device)
+                }
             }
 
             Component {

@@ -3,3 +3,4 @@ TailscaleLogo 1.0 TailscaleLogo.qml
 ExitNodeMenu 1.0 ExitNodeMenu.qml
 AccountMenu 1.0 AccountMenu.qml
 OperatorWarning 1.0 OperatorWarning.qml
+SendFilesModal 1.0 SendFilesModal.qml

@@ -46,6 +46,45 @@ PluginSettings {
     }
 
     SettingsCard {
+        title: "Taildrop"
+        iconName: "send"
+
+        // Controls are only meaningful when file sharing is enabled for the
+        // tailnet (an alpha, admin-console setting). Otherwise show how to turn
+        // it on. The settings themselves are still persisted either way.
+        ToggleSetting {
+            visible: TailscaleService.fileSharingEnabled
+            settingKey: "autoAccept"
+            label: "Auto-accept incoming files"
+            description: "Automatically receive Taildrop files in the background and save them to your download folder"
+            defaultValue: false
+        }
+
+        StringSetting {
+            visible: TailscaleService.fileSharingEnabled
+            settingKey: "downloadDir"
+            label: "Download folder"
+            placeholder: "~/Downloads (default)"
+            description: "Where received files are saved. Leave blank to use your Downloads folder."
+        }
+
+        StyledText {
+            visible: !TailscaleService.fileSharingEnabled
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Taildrop (file sharing) is off for your tailnet. Enable it in the Tailscale admin console to send and receive files."
+            color: Theme.surfaceVariantText
+        }
+
+        DankButton {
+            visible: !TailscaleService.fileSharingEnabled
+            text: "Open admin console"
+            iconName: "open_in_new"
+            onClicked: TailscaleService.openAdminConsole()
+        }
+    }
+
+    SettingsCard {
         title: "Requirements"
         iconName: "info"
 

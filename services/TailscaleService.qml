@@ -148,6 +148,25 @@ Singleton {
     property int pollIntervalMs: 5000
     property string copyField: "ip"
 
+    // --- taildrop (file sharing) ---
+    // The self node advertises this capability iff Taildrop is enabled for the
+    // tailnet in the admin console. It's an alpha, off-by-default feature, so
+    // all send/receive UI stays hidden until we see the cap. Parsed from
+    // `tailscale status --json` (Self.Capabilities / Self.CapMap).
+    readonly property string fileSharingCap: "https://tailscale.com/cap/file-sharing"
+    property bool fileSharingEnabled: false
+
+    // Auto-accept incoming files in the background (settings toggle, default
+    // off). The download folder — an explicit override, else the resolved XDG
+    // Downloads dir. Both bound from plugin settings by the widget.
+    property bool autoAccept: false
+    property string downloadDir: ""
+    property string defaultDownloadDir: ""
+    readonly property string effectiveDownloadDir: downloadDir || defaultDownloadDir
+
+    // True while a `tailscale file cp` is in flight.
+    property bool sending: false
+
     // Watchdog: force-terminate a CLI call that runs longer than this, so a
     // hung `tailscale` never leaves the widget stuck (busy stuck true, or a
     // read proc stuck running which silently halts polling). Actions
@@ -155,6 +174,10 @@ Singleton {
     // excluded since it legitimately blocks on browser auth.
     property int cliTimeoutMs: 15000
     property int actionTimeoutMs: 60000
+    // A send can legitimately take a while (large files), so it gets a generous
+    // leash — long enough for real transfers, but bounded so a stuck `file cp`
+    // (unreachable peer, no accept) can't wedge `sending` true forever.
+    property int sendTimeoutMs: 600000
 
     // Login runs as root via pkexec, and a non-root parent can't signal a root
     // child — so neither the Cancel button nor a Process kill can stop it.
@@ -311,6 +334,103 @@ Singleton {
         copyText(copyField === "dns" ? device.dnsName : device.ip);
     }
 
+    // --- taildrop ---
+
+    // Resolve the default download folder once at startup via xdg-user-dir,
+    // falling back to ~/Downloads if that tool is absent or prints nothing.
+    function resolveDownloadDir() {
+        if (!xdgDirProc.running)
+            xdgDirProc.running = true;
+    }
+
+    // Send files to a device via `tailscale file cp <files...> <target>:`. The
+    // target must be resolvable by the CLI; `label` is only for the toast.
+    // Runs on its own process — sends are long and independent of actionProc.
+    function sendFiles(target, paths, label) {
+        if (tailscaleMissing) {
+            ToastService.showError("Taildrop", "tailscale CLI not found");
+            return;
+        }
+        if (!target || !paths || paths.length === 0)
+            return;
+        if (sending) {
+            ToastService.showWarning("Taildrop is busy, try again");
+            return;
+        }
+        sending = true;
+        sendProc.target = label || target;
+        sendProc.fileCount = paths.length;
+        sendProc.command = ["tailscale", "file", "cp"].concat(paths).concat([target + ":"]);
+        sendProc.running = true;
+    }
+
+    // Convenience: send to a device object. Target by Tailscale IP — it's always
+    // resolvable, unlike the MagicDNS name, which fails to look up when MagicDNS
+    // is disabled for the tailnet. The name is used only for the toast.
+    function sendToDevice(device, paths) {
+        if (!device)
+            return;
+        sendFiles(device.ip || device.dnsName, paths, device.name || device.dnsName || device.ip);
+    }
+
+    function cancelSend() {
+        if (sendProc.running)
+            sendProc.signal(2);
+    }
+
+    // Manually pull any waiting Taildrop files into the download folder. The
+    // folder is created first (tailscale requires it to exist), and conflicts
+    // are renamed so nothing is overwritten.
+    function receiveFiles() {
+        if (tailscaleMissing) {
+            ToastService.showError("Taildrop", "tailscale CLI not found");
+            return;
+        }
+        if (receiveProc.running || effectiveDownloadDir === "")
+            return;
+        const dir = effectiveDownloadDir;
+        receiveProc.command = ["sh", "-c", 'mkdir -p "$0" && tailscale file get --verbose --conflict=rename "$0"', dir];
+        receiveProc.running = true;
+    }
+
+    // Pull the basename out of a `tailscale file get --verbose` progress line so
+    // received-file toasts can name the file. Best-effort: lines look like
+    // "<name> 100%  1.2 MB ..." or similar; fall back to the raw line.
+    function _receivedName(line) {
+        const t = (line || "").trim();
+        if (!t)
+            return "";
+        // Strip a trailing percentage/size progress tail if present.
+        const m = t.match(/^(.*?)\s+\d+%/);
+        return (m ? m[1] : t).trim();
+    }
+
+    function _loopShouldRun() {
+        return autoAccept && fileSharingEnabled && effectiveDownloadDir !== "" && !tailscaleMissing;
+    }
+
+    // Stop the background receiver when it should no longer run, or when the
+    // download folder changed under a running loop (so it restarts pointed at
+    // the new folder — the re-arm timer relaunches it). Starting is the timer's
+    // job; here we only ever stop. The loop runs as our own child (no pkexec),
+    // so SIGINT reaches it and `--loop` exits cleanly.
+    function _reconcileLoop() {
+        if (!_loopShouldRun()) {
+            if (loopProc.running) {
+                loopProc.signal(2);
+                loopProc.running = false;
+            }
+        } else if (loopProc.running && loopProc.activeDir !== effectiveDownloadDir) {
+            loopProc.signal(2);
+            loopProc.running = false;
+        }
+    }
+
+    onAutoAcceptChanged: _reconcileLoop()
+    onFileSharingEnabledChanged: _reconcileLoop()
+    onEffectiveDownloadDirChanged: _reconcileLoop()
+    onTailscaleMissingChanged: _reconcileLoop()
+
     function runAction(cmd, successMessage) {
         // With no binary the exec would fail without an onExited, leaving
         // busy stuck true (and the watchdog disarms before it can fire), so
@@ -432,6 +552,7 @@ Singleton {
             selfDevice = null;
             peers = [];
             backendState = "NoDaemon";
+            fileSharingEnabled = false;
             return;
         }
         let d;
@@ -446,6 +567,12 @@ Singleton {
         currentTailnet = (d.CurrentTailnet && d.CurrentTailnet.Name) || "";
         health = (d.Health || []).map(h => typeof h === "string" ? h : (h && h.Text) || "").filter(h => h.length > 0);
         selfDevice = d.Self ? _mapDevice(d.Self, d.User, true) : null;
+        // Detect Taildrop enablement from the self node's advertised caps. The
+        // array form is deprecated but still present; CapMap is the current
+        // form — accept either so this keeps working across CLI versions.
+        const caps = (d.Self && d.Self.Capabilities) || [];
+        const capMap = (d.Self && d.Self.CapMap) || {};
+        fileSharingEnabled = caps.indexOf(fileSharingCap) !== -1 || (fileSharingCap in capMap);
         const list = [];
         const peerMap = d.Peer || {};
         for (const key in peerMap)
@@ -596,6 +723,8 @@ Singleton {
         }
     }
 
+    Component.onCompleted: resolveDownloadDir()
+
     Timer {
         interval: root.pollIntervalMs
         running: true
@@ -651,6 +780,39 @@ Singleton {
         onTriggered: {
             actionProc.timedOut = true;
             actionProc.running = false;
+        }
+    }
+
+    // A manual `file get` shouldn't hang the button — bound like the polls.
+    Timer {
+        interval: root.cliTimeoutMs
+        repeat: true
+        running: receiveProc.running
+        onTriggered: receiveProc.running = false
+    }
+
+    // Bound the send so a stuck transfer can't wedge `sending`. Killing the
+    // process triggers sendProc.onExited (non-zero exit → error toast).
+    Timer {
+        interval: root.sendTimeoutMs
+        repeat: true
+        running: sendProc.running
+        onTriggered: sendProc.running = false
+    }
+
+    // (Re)start the background receiver whenever it should be running but isn't
+    // — covers the initial enable, a folder change (the reconcile handlers stop
+    // the stale loop, this restarts it fresh), and recovery after a tailscaled
+    // restart kills it. Following the codebase convention, loopProc.running is
+    // driven imperatively (never bound), so this is the sole starter; stopping
+    // is done by the reconcile handlers below.
+    Timer {
+        interval: 3000
+        repeat: true
+        running: root.autoAccept && root.fileSharingEnabled && root.effectiveDownloadDir !== "" && !root.tailscaleMissing && !loopProc.running
+        onTriggered: {
+            loopProc.activeDir = root.effectiveDownloadDir;
+            loopProc.running = true;
         }
     }
 
@@ -818,6 +980,105 @@ Singleton {
             }
             root._loginCancelled = false;
             root.refresh();
+        }
+    }
+
+    // Resolve the default download folder. xdg-user-dir prints the localized
+    // Downloads path; if it's missing or empty, fall back to ~/Downloads.
+    Process {
+        id: xdgDirProc
+        command: ["xdg-user-dir", "DOWNLOAD"]
+        stdout: StdioCollector {
+            id: xdgDirOut
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            const home = Quickshell.env("HOME") || "";
+            const out = (xdgDirOut.text || "").trim();
+            root.defaultDownloadDir = (exitCode === 0 && out) ? out : (home ? home + "/Downloads" : "");
+        }
+    }
+
+    // `tailscale file cp <files...> <target>:` — send. Its own process so a long
+    // transfer never blocks the mutating actionProc or the read polls.
+    Process {
+        id: sendProc
+
+        property string target: ""
+        property int fileCount: 0
+
+        stdout: StdioCollector {
+            id: sendOut
+            waitForEnd: true
+        }
+        stderr: StdioCollector {
+            id: sendErr
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            root.sending = false;
+            if (exitCode === 0) {
+                const n = sendProc.fileCount;
+                ToastService.showInfo("Sent " + n + (n === 1 ? " file to " : " files to ") + sendProc.target);
+            } else {
+                const msg = (sendErr.text || sendOut.text || "").trim().split("\n")[0];
+                ToastService.showError("Taildrop", msg || ("send failed (exit " + exitCode + ")"));
+            }
+        }
+    }
+
+    // Manual one-shot `tailscale file get` into the download folder.
+    Process {
+        id: receiveProc
+        stdout: StdioCollector {
+            id: receiveOut
+            waitForEnd: true
+        }
+        stderr: StdioCollector {
+            id: receiveErr
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            const out = (receiveOut.text || "").trim();
+            const err = (receiveErr.text || "").trim();
+            if (exitCode === 0) {
+                // --verbose prints a line per received file (to stdout or stderr
+                // depending on version); no output at all means nothing was
+                // waiting in the inbox.
+                if (out || err)
+                    ToastService.showInfo("Received files → " + root.effectiveDownloadDir);
+                else
+                    ToastService.showInfo("No incoming files");
+            } else {
+                ToastService.showError("Taildrop", (err || out).split("\n")[0] || ("receive failed (exit " + exitCode + ")"));
+            }
+        }
+    }
+
+    // Background auto-receiver: `tailscale file get --loop` blocks and writes
+    // files as they arrive. Runs only while auto-accept is on and Taildrop is
+    // enabled; lifecycle is managed by the re-arm timer + reconcile handlers.
+    // activeDir records the folder it was launched against so a settings change
+    // can trigger a restart.
+    Process {
+        id: loopProc
+
+        property string activeDir: ""
+
+        command: ["sh", "-c", 'mkdir -p "$0" && exec tailscale file get --loop --verbose --conflict=rename "$0"', root.effectiveDownloadDir]
+        stdout: SplitParser {
+            onRead: data => {
+                const name = root._receivedName(data);
+                if (name)
+                    ToastService.showInfo("Received " + name);
+            }
+        }
+        stderr: SplitParser {
+            onRead: data => {
+                const name = root._receivedName(data);
+                if (name)
+                    ToastService.showInfo("Received " + name);
+            }
         }
     }
 }
