@@ -8,6 +8,10 @@ DankModal {
 
     property int currentTab: 0
 
+    // Bubbled up so the root widget can open the send-files dialog for a device
+    // picked from the Devices tab.
+    signal sendRequested(var device)
+
     readonly property string statusLine: {
         if (TailscaleService.operatorMissing)
             return "Operator access required";
@@ -28,6 +32,9 @@ DankModal {
     modalWidth: 760
     modalHeight: 620
     enableShadow: true
+    // No dimming scrim behind the modal — click-outside-to-close still works
+    // (it's a separate click catcher, not the background).
+    showBackground: false
     closeOnEscapeKey: true
     closeOnBackgroundClick: true
     onBackgroundClicked: close()
@@ -179,7 +186,9 @@ DankModal {
 
             Component {
                 id: devicesTabComp
-                DevicesTab {}
+                DevicesTab {
+                    onSendRequested: device => modal.sendRequested(device)
+                }
             }
 
             Component {

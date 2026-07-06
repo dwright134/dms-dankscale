@@ -9,14 +9,23 @@ Rectangle {
     property bool compact: false
     property bool showDetails: false
 
+    // The send button sits above hoverArea and steals hover from it. The action
+    // icons are always visible (not hover-gated) so this no longer causes a
+    // layout shift, but we still OR this in for the row highlight so it stays
+    // lit while the cursor is over the button.
+    property bool sendHovered: false
+
     signal activated
+    signal send
+
+    readonly property bool canSend: TailscaleService.fileSharingEnabled && !(device?.isSelf ?? false) && (device?.online ?? false)
 
     readonly property bool isOnline: device?.online ?? false
     readonly property bool isExitActive: device?.exitNode ?? false
 
     height: compact ? 44 : 56
     radius: Theme.cornerRadius
-    color: hoverArea.containsMouse ? Theme.surfaceHover : "transparent"
+    color: (hoverArea.containsMouse || root.sendHovered) ? Theme.surfaceHover : "transparent"
 
     Rectangle {
         id: statusDot
@@ -77,10 +86,12 @@ Rectangle {
         }
     }
 
+    // Status markers (subnet / exit node) — placed before the action icons so
+    // the icons keep a stable position regardless of which markers are present.
     Row {
         id: badges
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacingM
+        anchors.right: copyIcon.left
+        anchors.rightMargin: Theme.spacingS
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.spacingXS
 
@@ -117,14 +128,19 @@ Rectangle {
                 color: root.isExitActive ? Theme.primaryText : Theme.surfaceVariantText
             }
         }
+    }
 
-        DankIcon {
-            visible: hoverArea.containsMouse
-            anchors.verticalCenter: parent.verticalCenter
-            name: "content_copy"
-            size: Theme.iconSizeSmall
-            color: Theme.primary
-        }
+    // Copy hint — always visible now (a stable layout avoids the hover flicker),
+    // brightening when the row is hovered. Non-interactive: the row's MouseArea
+    // beneath handles the actual copy click.
+    DankIcon {
+        id: copyIcon
+        anchors.right: root.canSend ? sendButton.left : parent.right
+        anchors.rightMargin: root.canSend ? Theme.spacingXS : Theme.spacingM
+        anchors.verticalCenter: parent.verticalCenter
+        name: "content_copy"
+        size: Theme.iconSizeSmall
+        color: hoverArea.containsMouse ? Theme.primary : Theme.surfaceVariantText
     }
 
     MouseArea {
@@ -133,5 +149,24 @@ Rectangle {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: root.activated()
+    }
+
+    // Send-files action. Declared after hoverArea so it sits on top and its own
+    // click is consumed here (the row's copy action does not also fire). Always
+    // visible (not hover-gated) for online, non-self devices while Taildrop is
+    // enabled, so its position never shifts.
+    DankActionButton {
+        id: sendButton
+        visible: root.canSend
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacingM
+        anchors.verticalCenter: parent.verticalCenter
+        buttonSize: root.compact ? 28 : 32
+        iconName: "upload_file"
+        iconColor: Theme.primary
+        tooltipText: "Send files"
+        onEntered: root.sendHovered = true
+        onExited: root.sendHovered = false
+        onClicked: root.send()
     }
 }

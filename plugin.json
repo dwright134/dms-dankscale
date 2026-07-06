@@ -1,8 +1,8 @@
 {
     "id": "dankscale",
     "name": "Dankscale",
-    "description": "Manage your Tailscale network: connect/disconnect, switch accounts, copy device IPs, pick exit nodes, manage routes, and control DNS",
-    "version": "0.2.0",
+    "description": "Manage your Tailscale network: connect/disconnect, switch accounts, copy device IPs, pick exit nodes, manage routes, control DNS, and send/receive files with Taildrop",
+    "version": "0.3.0",
     "author": "dwright",
     "icon": "apps",
     "screenshot": "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/screenshot.png",
@@ -11,7 +11,7 @@
         "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/manager.png"
     ],
     "type": "widget",
-    "capabilities": ["dankbar-widget", "control-center", "vpn", "network"],
+    "capabilities": ["dankbar-widget", "control-center", "vpn", "network", "file-transfer"],
     "component": "./Tailscale.qml",
     "settings": "./TailscaleSettings.qml",
     "requires_dms": ">=1.4.0",

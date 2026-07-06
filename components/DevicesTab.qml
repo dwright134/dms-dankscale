@@ -7,6 +7,8 @@ Item {
 
     property string filterText: ""
 
+    signal sendRequested(var device)
+
     readonly property var visibleDevices: TailscaleService.allDevices.filter(d => {
         if (!tab.filterText)
             return true;
@@ -56,6 +58,7 @@ Item {
                         device: modelData
                         showDetails: true
                         onActivated: TailscaleService.copyDevice(modelData)
+                        onSend: tab.sendRequested(modelData)
                     }
                 }
 

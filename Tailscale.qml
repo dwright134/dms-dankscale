@@ -13,6 +13,8 @@ PluginComponent {
     readonly property int pollSeconds: parseInt(pluginData.pollSeconds) || 5
     readonly property string copyPreference: pluginData.copyField || "ip"
     readonly property bool showOffline: pluginData.showOffline === undefined ? true : pluginData.showOffline === true
+    readonly property bool autoAccept: pluginData.autoAccept === true
+    readonly property string downloadDir: pluginData.downloadDir || ""
 
     readonly property string statusText: {
         if (TailscaleService.tailscaleMissing)
@@ -43,6 +45,18 @@ PluginComponent {
         target: TailscaleService
         property: "copyField"
         value: root.copyPreference
+    }
+
+    Binding {
+        target: TailscaleService
+        property: "autoAccept"
+        value: root.autoAccept
+    }
+
+    Binding {
+        target: TailscaleService
+        property: "downloadDir"
+        value: root.downloadDir
     }
 
     // Persist which account was last active so the popout can still show it as
@@ -80,8 +94,22 @@ PluginComponent {
         managerModal.open();
     }
 
+    function openSend(device) {
+        if (!device)
+            return;
+        closePopout();
+        sendModal.stagedFiles = [];
+        sendModal.targetDevice = device;
+        sendModal.open();
+    }
+
     TailscaleManagerModal {
         id: managerModal
+        onSendRequested: device => root.openSend(device)
+    }
+
+    SendFilesModal {
+        id: sendModal
     }
 
     IpcHandler {
@@ -232,6 +260,19 @@ PluginComponent {
                     spacing: Theme.spacingXS
 
                     DankActionButton {
+                        // Manual Taildrop pull — the fallback when auto-accept is
+                        // off. Hidden once auto-accept handles receiving, and when
+                        // the tailnet doesn't have file sharing enabled.
+                        visible: TailscaleService.fileSharingEnabled && !root.autoAccept
+                        iconName: "download"
+                        iconColor: Theme.surfaceVariantText
+                        buttonSize: 28
+                        tooltipText: "Check for incoming files"
+                        tooltipSide: "bottom"
+                        onClicked: TailscaleService.receiveFiles()
+                    }
+
+                    DankActionButton {
                         iconName: "refresh"
                         iconColor: Theme.surfaceVariantText
                         buttonSize: 28
@@ -241,12 +282,15 @@ PluginComponent {
                     }
 
                     DankActionButton {
-                        iconName: "open_in_new"
+                        iconName: "settings"
                         iconColor: Theme.surfaceVariantText
                         buttonSize: 28
-                        tooltipText: "Open Manager"
+                        tooltipText: "Plugin settings"
                         tooltipSide: "bottom"
-                        onClicked: root.openManager()
+                        onClicked: {
+                            root.closePopout();
+                            PopoutService.openSettingsWithTab("plugins");
+                        }
                     }
                 }
             }
@@ -525,6 +569,7 @@ PluginComponent {
                                     device: modelData
                                     compact: true
                                     onActivated: TailscaleService.copyDevice(modelData)
+                                    onSend: root.openSend(modelData)
                                 }
                             }
 
