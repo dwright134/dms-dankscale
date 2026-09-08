@@ -933,7 +933,7 @@ Singleton {
 
     Process {
         id: grantProc
-        command: ["pkexec", "tailscale", "set", "--operator=" + root.currentUser]
+        command: ["pkexec", "/usr/bin/env", "TS_BE_CLI=1", "tailscale", "set", "--operator=" + root.currentUser]
         stderr: StdioCollector {
             id: grantErr
             waitForEnd: true
