@@ -247,6 +247,18 @@ PluginComponent {
         PopoutComponent {
             id: popout
 
+            readonly property bool detailsVisible: parentPopout?.shouldBeVisible ?? false
+            onDetailsVisibleChanged: {
+                if (detailsVisible)
+                    TailscaleService.acquireDetails();
+                else
+                    TailscaleService.releaseDetails();
+            }
+            Component.onDestruction: {
+                if (detailsVisible)
+                    TailscaleService.releaseDetails();
+            }
+
             // Without operator rights every control here would fail, so the
             // popout shows only the OperatorWarning until access is granted.
             readonly property bool locked: TailscaleService.operatorMissing

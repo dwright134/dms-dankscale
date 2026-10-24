@@ -74,7 +74,7 @@ Item {
                                     width: 10
                                     height: 10
                                     radius: 5
-                                    color: "#4CAF50"
+                                    color: Theme.success
                                     border.width: 2
                                     border.color: acctRow.selected ? Theme.primaryPressed : Theme.surfaceContainerHigh
                                     anchors.right: acctIcon.right
@@ -318,7 +318,7 @@ Item {
                                     height: 12
                                     radius: 6
                                     anchors.verticalCenter: parent.verticalCenter
-                                    color: detailCol.loggedIn ? "#4CAF50" : Theme.surfaceVariantText
+                                    color: detailCol.loggedIn ? Theme.success : Theme.surfaceVariantText
                                 }
 
                                 StyledText {
