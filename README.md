@@ -77,6 +77,12 @@ Everything is driven by the `tailscale` CLI — no daemons, no external helpers:
 - `tailscale file cp <files> <device>:` — send files with Taildrop
 - `tailscale file get [--loop] <dir>` — receive Taildrop files (auto-accept runs it with `--loop`)
 
+With the popout and Manager closed, only `tailscale status --json` is polled
+at the configured refresh interval. Preferences, accounts, and DNS details are
+loaded at startup, when either UI opens, after actions, and when status detects
+a connection or account change. While either UI is open, those details also
+refresh at the configured interval.
+
 ## License
 
 [MIT](LICENSE)

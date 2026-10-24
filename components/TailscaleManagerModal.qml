@@ -8,6 +8,17 @@ DankModal {
 
     property int currentTab: 0
 
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible)
+            TailscaleService.acquireDetails();
+        else
+            TailscaleService.releaseDetails();
+    }
+    Component.onDestruction: {
+        if (shouldBeVisible)
+            TailscaleService.releaseDetails();
+    }
+
     // Bubbled up so the root widget can open the send-files dialog for a device
     // picked from the Devices tab.
     signal sendRequested(var device)

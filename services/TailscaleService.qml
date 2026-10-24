@@ -147,6 +147,8 @@ Singleton {
     // --- config (bound from plugin settings) ---
     property int pollIntervalMs: 5000
     property string copyField: "ip"
+    property int detailConsumers: 0
+    property string _detailStateKey: ""
 
     // --- taildrop (file sharing) ---
     // The self node advertises this capability iff Taildrop is enabled for the
@@ -186,6 +188,11 @@ Singleton {
     property int loginTimeoutSecs: 180
 
     function refresh() {
+        refreshStatus();
+        refreshDetails();
+    }
+
+    function refreshStatus() {
         // Probe for the binary once at startup, then only while it's missing
         // (so a later install is picked up) — no point re-checking every poll
         // once we know it's present.
@@ -195,12 +202,37 @@ Singleton {
         }
         if (!statusProc.running)
             statusProc.running = true;
-        if (!prefsProc.running)
-            prefsProc.running = true;
-        if (!accountsProc.running)
-            accountsProc.running = true;
-        if (!dnsStatusProc.running)
-            dnsStatusProc.running = true;
+    }
+
+    // A refresh requested during a read must run again after it exits, so an
+    // action can't leave us displaying a snapshot taken before the action.
+    function requestDetailRead(proc) {
+        if (proc.running)
+            proc.refreshPending = true;
+        else
+            proc.running = true;
+    }
+
+    function finishDetailRead(proc) {
+        if (!proc.refreshPending)
+            return;
+        proc.refreshPending = false;
+        Qt.callLater(() => root.requestDetailRead(proc));
+    }
+
+    function refreshDetails() {
+        requestDetailRead(prefsProc);
+        requestDetailRead(accountsProc);
+        requestDetailRead(dnsStatusProc);
+    }
+
+    function acquireDetails() {
+        detailConsumers++;
+        refresh();
+    }
+
+    function releaseDetails() {
+        detailConsumers = Math.max(0, detailConsumers - 1);
     }
 
     function toggleConnection() {
@@ -553,6 +585,7 @@ Singleton {
             peers = [];
             backendState = "NoDaemon";
             fileSharingEnabled = false;
+            _detailStateKey = "NoDaemon";
             return;
         }
         let d;
@@ -579,6 +612,13 @@ Singleton {
             list.push(_mapDevice(peerMap[key], d.User, false));
         list.sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
         peers = list;
+        // Refresh details after daemon recovery, login/logout, or an external
+        // profile switch, even if the manager and popout are closed.
+        const stateKey = JSON.stringify([backendState, d.Self?.ID, d.Self?.UserID, currentTailnet]);
+        const changed = _detailStateKey !== "" && _detailStateKey !== stateKey;
+        _detailStateKey = stateKey;
+        if (changed)
+            refreshDetails();
     }
 
     function _handleAccounts(exitCode, out) {
@@ -723,14 +763,20 @@ Singleton {
         }
     }
 
-    Component.onCompleted: resolveDownloadDir()
+    Component.onCompleted: {
+        resolveDownloadDir();
+        refresh();
+    }
 
     Timer {
         interval: root.pollIntervalMs
         running: true
         repeat: true
-        triggeredOnStart: true
-        onTriggered: root.refresh()
+        onTriggered: {
+            root.refreshStatus();
+            if (root.detailConsumers > 0)
+                root.refreshDetails();
+        }
     }
 
     // Watchdogs — each is armed while its process runs and fires only if the
@@ -847,32 +893,44 @@ Singleton {
 
     Process {
         id: prefsProc
+        property bool refreshPending: false
         command: ["tailscale", "debug", "prefs"]
         stdout: StdioCollector {
             id: prefsOut
             waitForEnd: true
         }
-        onExited: exitCode => root._handlePrefs(exitCode, prefsOut.text)
+        onExited: exitCode => {
+            root._handlePrefs(exitCode, prefsOut.text);
+            root.finishDetailRead(prefsProc);
+        }
     }
 
     Process {
         id: accountsProc
+        property bool refreshPending: false
         command: ["tailscale", "switch", "--list"]
         stdout: StdioCollector {
             id: accountsOut
             waitForEnd: true
         }
-        onExited: exitCode => root._handleAccounts(exitCode, accountsOut.text)
+        onExited: exitCode => {
+            root._handleAccounts(exitCode, accountsOut.text);
+            root.finishDetailRead(accountsProc);
+        }
     }
 
     Process {
         id: dnsStatusProc
+        property bool refreshPending: false
         command: ["tailscale", "dns", "status", "--json"]
         stdout: StdioCollector {
             id: dnsStatusOut
             waitForEnd: true
         }
-        onExited: exitCode => root._handleDnsStatus(exitCode, dnsStatusOut.text)
+        onExited: exitCode => {
+            root._handleDnsStatus(exitCode, dnsStatusOut.text);
+            root.finishDetailRead(dnsStatusProc);
+        }
     }
 
     Process {
