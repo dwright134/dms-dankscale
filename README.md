@@ -13,13 +13,13 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 - Current account, one-click switch to the next account
 - Current exit node, one-click disable
 - Device list — click any device to copy its Tailscale IP (or MagicDNS name) to the clipboard, or hover and hit the send button to share files via Taildrop
-- Click a device's **exit node** badge to select it as your exit node
+- Click a device's **exit node** badge to select it as your exit node; click its active badge to stop using an exit node
 - Check-for-incoming-files button (when auto-accept is off)
 - "Open Manager" button
 
 **Manager (popup)**
 - **Devices** — filterable list of every device on the tailnet with online status, OS, owner, subnet/exit-node badges; click to copy address, or use the send button to share files via Taildrop
-- Click an **exit node** badge to select that device without switching tabs
+- Click an **exit node** badge to select that device without switching tabs; click its active badge to stop using an exit node
 - **Exit Nodes** — pick or clear the exit node, allow-LAN-access toggle, advertise this device as an exit node
 - **Routes** — accept-routes toggle, advertise subnet routes from this device, list of subnet routers on the tailnet
 - **DNS** — "Use Tailscale DNS" toggle, current DNS configuration (MagicDNS state, suffix, this device's DNS name, search domains, split-DNS routes), and a DNS lookup tool that resolves names through the tailnet resolver

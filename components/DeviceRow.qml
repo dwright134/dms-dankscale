@@ -135,12 +135,16 @@ Rectangle {
 
             StateLayer {
                 id: exitState
-                enabled: root.canSelectExitNode
+                enabled: root.canSelectExitNode || root.isExitActive
                 disabled: TailscaleService.busy
                 stateColor: root.isExitActive ? Theme.primaryText : Theme.primary
-                tooltipText: root.isExitActive ? "Currently selected exit node" : "Use as exit node"
+                tooltipText: root.isExitActive ? "Stop using exit node" : "Use as exit node"
                 onClicked: {
-                    if (!disabled && !root.isExitActive)
+                    if (disabled)
+                        return;
+                    if (root.isExitActive)
+                        TailscaleService.setExitNode("", "");
+                    else
                         TailscaleService.setExitNode(root.device.ip, root.device.name);
                 }
             }
