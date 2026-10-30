@@ -2,7 +2,7 @@
     "id": "dankscale",
     "name": "Dankscale",
     "description": "Manage your Tailscale network: connect/disconnect, switch accounts, copy device IPs, pick exit nodes, manage routes, control DNS, and send/receive files with Taildrop",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "author": "dwright",
     "icon": "apps",
     "screenshot": "https://raw.githubusercontent.com/dwright134/dms-dankscale/main/docs/screenshot.png",
