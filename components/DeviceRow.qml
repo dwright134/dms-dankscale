@@ -9,7 +9,7 @@ Rectangle {
     property bool compact: false
     property bool showDetails: false
 
-    // The send button sits above hoverArea and steals hover from it. The action
+    // The send button and exit badge sit above hoverArea. The action
     // icons are always visible (not hover-gated) so this no longer causes a
     // layout shift, but we still OR this in for the row highlight so it stays
     // lit while the cursor is over the button.
@@ -21,11 +21,12 @@ Rectangle {
     readonly property bool canSend: TailscaleService.fileSharingEnabled && !(device?.isSelf ?? false) && (device?.online ?? false)
 
     readonly property bool isOnline: device?.online ?? false
-    readonly property bool isExitActive: device?.exitNode ?? false
+    readonly property bool isExitActive: device != null && !(device?.isSelf ?? false) && TailscaleService.isExitNodeSelected(device)
+    readonly property bool canSelectExitNode: !(device?.isSelf ?? false) && (device?.exitNodeOption ?? false) && (device?.ip ?? "") !== ""
 
     height: compact ? 44 : 56
     radius: Theme.cornerRadius
-    color: (hoverArea.containsMouse || root.sendHovered) ? Theme.surfaceHover : "transparent"
+    color: (hoverArea.containsMouse || root.sendHovered || exitState.containsMouse) ? Theme.surfaceHover : "transparent"
 
     Rectangle {
         id: statusDot
@@ -90,6 +91,8 @@ Rectangle {
     // the icons keep a stable position regardless of which markers are present.
     Row {
         id: badges
+        // Keep badge actions above the row's copy handler.
+        z: 1
         anchors.right: copyIcon.left
         anchors.rightMargin: Theme.spacingS
         anchors.verticalCenter: parent.verticalCenter
@@ -113,6 +116,8 @@ Rectangle {
         }
 
         Rectangle {
+            id: exitBadge
+            objectName: "exitNodeBadge"
             visible: (root.device?.exitNodeOption ?? false) || root.isExitActive
             anchors.verticalCenter: parent.verticalCenter
             height: 20
@@ -126,6 +131,22 @@ Rectangle {
                 text: root.isExitActive ? "exit • active" : "exit node"
                 font.pixelSize: Theme.fontSizeSmall - 1
                 color: root.isExitActive ? Theme.primaryText : Theme.surfaceVariantText
+            }
+
+            StateLayer {
+                id: exitState
+                enabled: root.canSelectExitNode || root.isExitActive
+                disabled: TailscaleService.busy
+                stateColor: root.isExitActive ? Theme.primaryText : Theme.primary
+                tooltipText: root.isExitActive ? "Stop using exit node" : "Use as exit node"
+                onClicked: {
+                    if (disabled)
+                        return;
+                    if (root.isExitActive)
+                        TailscaleService.setExitNode("", "");
+                    else
+                        TailscaleService.setExitNode(root.device.ip, root.device.name);
+                }
             }
         }
     }

@@ -457,7 +457,7 @@ PluginComponent {
                     }
                 }
 
-                // Exit node card — click to reveal the exit node menu
+                // Extra exit node settings: LAN access and advertising this device.
                 StyledRect {
                     id: exitCard
 
@@ -481,15 +481,15 @@ PluginComponent {
                         anchors.left: parent.left
                         anchors.leftMargin: Theme.spacingM
                         anchors.verticalCenter: parent.verticalCenter
-                        name: "vpn_lock"
+                        name: "tune"
                         size: Theme.iconSize - 2
-                        color: TailscaleService.activeExitNode ? Theme.primary : Theme.surfaceVariantText
+                        color: Theme.surfaceVariantText
                     }
 
                     Column {
                         anchors.left: exitIcon.right
                         anchors.leftMargin: Theme.spacingM
-                        anchors.right: clearExitButton.visible ? clearExitButton.left : exitChevron.left
+                        anchors.right: exitChevron.left
                         anchors.rightMargin: Theme.spacingS
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 1
@@ -497,13 +497,13 @@ PluginComponent {
                         StyledText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: TailscaleService.activeExitNode ? TailscaleService.activeExitNode.name : "No exit node"
+                            text: "Exit node settings"
                         }
 
                         StyledText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: "Exit node"
+                            text: "LAN access and advertising"
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                         }
@@ -526,23 +526,10 @@ PluginComponent {
                         }
                     }
 
-                    DankActionButton {
-                        id: clearExitButton
-                        visible: TailscaleService.activeExitNode !== null
-                        anchors.right: exitChevron.left
-                        anchors.rightMargin: Theme.spacingXS
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: "close"
-                        iconColor: Theme.surfaceVariantText
-                        tooltipText: "Disable exit node"
-                        onClicked: TailscaleService.setExitNode("", "")
-                    }
-
                     ExitNodeMenu {
                         visible: exitCard.menuOpen
                         y: exitCard.height + Theme.spacingXS
                         width: exitCard.width
-                        onDismissed: exitCard.menuOpen = false
                     }
                 }
 
