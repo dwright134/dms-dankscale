@@ -457,7 +457,7 @@ PluginComponent {
                     }
                 }
 
-                // Exit node status card — click for LAN access and advertising settings
+                // Extra exit node settings: LAN access and advertising this device.
                 StyledRect {
                     id: exitCard
 
@@ -481,9 +481,9 @@ PluginComponent {
                         anchors.left: parent.left
                         anchors.leftMargin: Theme.spacingM
                         anchors.verticalCenter: parent.verticalCenter
-                        name: "vpn_lock"
+                        name: "tune"
                         size: Theme.iconSize - 2
-                        color: TailscaleService.activeExitNode ? Theme.primary : Theme.surfaceVariantText
+                        color: Theme.surfaceVariantText
                     }
 
                     Column {
@@ -497,13 +497,13 @@ PluginComponent {
                         StyledText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: TailscaleService.activeExitNode ? TailscaleService.activeExitNode.name : "No exit node"
+                            text: "Exit node settings"
                         }
 
                         StyledText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: "Exit node"
+                            text: "LAN access and advertising"
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                         }

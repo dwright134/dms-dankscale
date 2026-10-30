@@ -2,7 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 
-// Extra settings for the popout's exit node status card.
+// Extra settings for the popout's exit node settings card.
 StyledRect {
     id: menu
 
