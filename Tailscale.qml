@@ -457,7 +457,7 @@ PluginComponent {
                     }
                 }
 
-                // Exit node card — click to reveal the exit node menu
+                // Exit node status card — click for LAN access and advertising settings
                 StyledRect {
                     id: exitCard
 
@@ -489,7 +489,7 @@ PluginComponent {
                     Column {
                         anchors.left: exitIcon.right
                         anchors.leftMargin: Theme.spacingM
-                        anchors.right: clearExitButton.visible ? clearExitButton.left : exitChevron.left
+                        anchors.right: exitChevron.left
                         anchors.rightMargin: Theme.spacingS
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 1
@@ -526,23 +526,10 @@ PluginComponent {
                         }
                     }
 
-                    DankActionButton {
-                        id: clearExitButton
-                        visible: TailscaleService.activeExitNode !== null
-                        anchors.right: exitChevron.left
-                        anchors.rightMargin: Theme.spacingXS
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: "close"
-                        iconColor: Theme.surfaceVariantText
-                        tooltipText: "Disable exit node"
-                        onClicked: TailscaleService.setExitNode("", "")
-                    }
-
                     ExitNodeMenu {
                         visible: exitCard.menuOpen
                         y: exitCard.height + Theme.spacingXS
                         width: exitCard.width
-                        onDismissed: exitCard.menuOpen = false
                     }
                 }
 

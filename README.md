@@ -11,7 +11,7 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 **Drop-down (click the bar icon)**
 - Connect / disconnect toggle
 - Current account, one-click switch to the next account
-- Current exit node, one-click disable
+- Current exit node, with a dropdown for LAN access and advertising this device as an exit node
 - Device list — click any device to copy its Tailscale IP (or MagicDNS name) to the clipboard, or hover and hit the send button to share files via Taildrop
 - Click a device's **exit node** badge to select it as your exit node; click its active badge to stop using an exit node
 - Check-for-incoming-files button (when auto-accept is off)
