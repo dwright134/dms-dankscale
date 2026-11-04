@@ -737,9 +737,9 @@ Singleton {
     function grantOperator() {
         if (!currentUser || currentUser === "root")
             return;
-        if (grantProc.running)
+        if (grantLookupProc.running || grantProc.running)
             return;
-        grantProc.running = true;
+        grantLookupProc.running = true;
     }
 
     function setOperatorMissing(missing) {
@@ -989,9 +989,30 @@ Singleton {
         }
     }
 
+    // Resolve on each click using the widget's PATH, before pkexec replaces it.
+    // Keep the profile symlink rather than canonicalizing it to a Nix store path.
+    Process {
+        id: grantLookupProc
+        command: ["sh", "-c", 'path=$(command -v tailscale) || exit 1; case "$path" in /*) ;; *) path="$(pwd -P)/$path" ;; esac; [ -f "$path" ] && [ -x "$path" ] || exit 1; printf "%s" "$path"']
+        stdout: StdioCollector {
+            id: grantPathOut
+            waitForEnd: true
+        }
+        onExited: exitCode => {
+            const path = grantPathOut.text;
+            if (exitCode !== 0 || !path.startsWith("/")) {
+                ToastService.showError("Tailscale", "Cannot find an executable tailscale CLI in the widget's PATH");
+                return;
+            }
+            // env sets the flag after elevation; the absolute path avoids a
+            // second lookup in root's PATH. Pass all values as separate arguments.
+            grantProc.command = ["pkexec", "/usr/bin/env", "TS_BE_CLI=1", path, "set", "--operator=" + root.currentUser];
+            grantProc.running = true;
+        }
+    }
+
     Process {
         id: grantProc
-        command: ["pkexec", "tailscale", "set", "--operator=" + root.currentUser]
         stderr: StdioCollector {
             id: grantErr
             waitForEnd: true
@@ -999,13 +1020,10 @@ Singleton {
         onExited: exitCode => {
             if (exitCode === 0) {
                 ToastService.showInfo("Operator access granted");
-            } else {
-                // pkexec exits non-zero and prints nothing when the user just
-                // dismisses the prompt — only surface an error when there's
-                // actual stderr (a real auth or command failure).
+            } else if (exitCode !== 126) {
+                // 126 means the user dismissed the authentication prompt.
                 const msg = (grantErr.text || "").trim().split("\n")[0];
-                if (msg)
-                    ToastService.showError("Tailscale", msg);
+                ToastService.showError("Tailscale", msg || "Operator setup failed (exit " + exitCode + ")");
             }
             root.refresh();
         }

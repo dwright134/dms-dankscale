@@ -37,12 +37,37 @@ A DankMaterialShell (Quickshell) plugin that manages your Tailscale network from
 ## Requirements
 
 - DankMaterialShell ≥ 1.4.0
-- `tailscale` CLI with `tailscaled` running
-- Your user set as the Tailscale operator so no root prompts are needed:
+- `tailscale` CLI on DMS's `PATH`, with `tailscaled` running
+- Your user set as the Tailscale operator for routine controls. Use **Grant operator** in the widget, or run:
 
   ```sh
   sudo tailscale set --operator=$USER
   ```
+
+## Operator setup troubleshooting
+
+**NixOS and custom installations:** **Grant operator** discovers Tailscale's
+absolute path on each click and sets `TS_BE_CLI=1` to handle NixOS's combined
+CLI/daemon package. It requires `pkexec`, `/usr/bin/env`, and a working polkit
+authentication agent.
+
+If Tailscale works in a terminal but the widget cannot find it, add its directory
+to the `PATH` of the desktop session or service that launches DMS, then restart
+DMS. A terminal-only alias or shell configuration is not enough.
+
+**Custom polkit rules:** No policy changes are needed with normal administrator
+authentication. Rules matching the Tailscale executable may no longer apply to
+**Grant operator**, because polkit now authorizes `env`. Use the normal password
+prompt or the manual command below. Do not change a passwordless Tailscale rule
+to allow `env`; that would permit arbitrary commands. See the
+[pkexec authorization documentation](https://www.freedesktop.org/software/polkit/docs/latest/pkexec.1.html#pkexec-security-notes).
+
+**Manual fallback:** Run `command -v tailscale` in your terminal and substitute
+its absolute path below:
+
+```sh
+sudo /usr/bin/env TS_BE_CLI=1 /absolute/path/to/tailscale set --operator="$USER"
+```
 
 ## Install
 
